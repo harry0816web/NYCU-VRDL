@@ -19,9 +19,9 @@ The final output is a `prediction.csv` file for the test set.
   ```bash
    pip install -r requirements.txt
   ```
-3. **資料集目錄 `data/`**
+3. **Dataset directory `data/`**
 
-   請將課程提供的影像資料放在專案根目錄底下的 `data/`。`train.py` 會從此路徑讀取資料，目錄架構如下：
+   Place the course image data under `data/` at the project root. `train.py` reads from this path. The expected layout is:
 
    ```text
    data/
@@ -40,8 +40,9 @@ The final output is a `prediction.csv` file for the test set.
        └── ...                    # no label
    ```
 
-   - **train / val**：須符合 PyTorch `ImageFolder` 慣例，同一類別的影像放在同一子資料夾；`train` 與 `val` 的類別子資料夾名稱需一致，以便標籤對應。
-   - **test**：所有待預測影像直接放在 `data/test/` 根層。
+   - **train / val**: Must follow the PyTorch `ImageFolder` layout—images of the same class live in one subfolder; class folder names must match between `train` and `val` so labels align.
+   - **test**: Put all images to predict directly under `data/test/` (no subfolders by class).
+
 4. Configure Weights & Biases API key:
   - Replace `os.environ['WANDB_API_KEY']` in `train.py`, or
   - Export environment variable before running:
