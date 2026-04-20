@@ -1,4 +1,4 @@
-# NYCU Computer Vision 2026 HW1
+# NYCU VRDL 2026 HW1
 
 - Student ID: `112550097`
 - Name: `Hung-I Yang`
