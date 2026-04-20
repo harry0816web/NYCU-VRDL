@@ -1,0 +1,107 @@
+{
+    "lr": 1e-4,
+    "lr_backbone": 1e-5,
+    "lr_linear_proj_mult": 0.1,
+    "batch_size": 8,
+    "weight_decay": 1e-4,
+    "epochs": 20,
+    "lr_drop": 15,
+    "clip_max_norm": 0.1,
+
+    "num_classes": 11,
+    "num_queries": 30,
+
+    "backbone": "resnet50",
+    "dilation": false,
+    "return_interm_indices": [1, 2, 3],
+
+    "pe_temperatureH": 20,
+    "pe_temperatureW": 20,
+
+    "enc_layers": 3,
+    "dec_layers": 3,
+    "dim_feedforward": 512,
+    "hidden_dim": 256,
+    "dropout": 0.2,
+    "nheads": 4,
+    "pre_norm": false,
+    "transformer_activation": "relu",
+
+    "num_feature_levels": 4,
+    "enc_n_points": 4,
+    "dec_n_points": 4,
+
+    "two_stage_type": "standard",
+    "two_stage_learn_wh": false,
+    "two_stage_keep_all_tokens": false,
+    "two_stage_pat_embed": 0,
+    "two_stage_add_query_num": 0,
+    "embed_init_tgt": true,
+
+    "decoder_sa_type": "sa",
+    "decoder_module_seq": ["sa", "ca", "ffn"],
+
+    "use_dn": true,
+    "dn_number": 10,
+    "dn_box_noise_scale": 0.4,
+    "dn_label_noise_ratio": 0.5,
+    "dn_labelbook_size": 11,
+
+    "aux_loss": true,
+
+    "set_cost_class": 2.0,
+    "set_cost_bbox": 5.0,
+    "set_cost_giou": 2.0,
+
+    "cls_loss_coef": 1.0,
+    "bbox_loss_coef": 5.0,
+    "giou_loss_coef": 2.0,
+    "focal_alpha": 0.25,
+
+    "interm_loss_coef": 1.0,
+    "no_interm_box_loss": false,
+
+    "dec_pred_class_embed_share": true,
+    "dec_pred_bbox_embed_share": true,
+    "two_stage_class_embed_share": false,
+    "two_stage_bbox_embed_share": false,
+
+    "num_select": 30,
+    "nms_iou_threshold": -1,
+
+    "train_short_edge": 320,
+    "train_max_size": 640,
+    "train_random_scale_min": 0.9,
+    "train_random_scale_max": 1.0,
+    "val_short_edge": 320,
+    "val_max_size": 640,
+    "lr_eta_min": 1e-6,
+
+    "augment_degrees": 5.0,
+    "augment_translate": [0.1, 0.1],
+    "augment_perspective_scale": 0.1,
+    "augment_perspective_p": 0.5,
+    "augment_blur_kernel": 5,
+    "augment_blur_sigma": [0.1, 2.0],
+    "augment_blur_p": 0.5,
+    "augment_min_visibility": 0.5,
+    "aug_rotation_p": 0.0,
+    "aug_color_jitter_p": 0.8,
+
+    "aug_iso_noise": true,
+    "aug_iso_noise_p": 0.2,
+    "aug_iso_noise_intensity": 0.05,
+    "aug_crop_p": 0.5,
+    "aug_crop_scale": [0.6, 1.0],
+
+    "data_path": "../data",
+    "train_json": "train.json",
+    "valid_json": "valid.json",
+
+    "device": "cuda",
+    "seed": 42,
+    "num_workers": 6,
+    "output_dir": "./output",
+    "resume": "",
+    "finetune_from": ""
+}

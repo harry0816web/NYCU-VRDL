@@ -1,0 +1,5 @@
+# ninja log v7
+0	7044	1776173482490000000	/mnt/M3_Lab/Chiikawa/detection/DINO/models/dino/ops/build/temp.linux-x86_64-cpython-39/mnt/M3_Lab/Chiikawa/detection/DINO/models/dino/ops/src/cpu/ms_deform_attn_cpu.o	4da4e974f0018548
+1	12634	1776173482490000000	/mnt/M3_Lab/Chiikawa/detection/DINO/models/dino/ops/build/temp.linux-x86_64-cpython-39/mnt/M3_Lab/Chiikawa/detection/DINO/models/dino/ops/src/vision.o	dacfd86d1ca6739f
+8	7927	1776173572870000000	/mnt/M3_Lab/Chiikawa/detection/DINO/models/dino/ops/build/temp.linux-x86_64-cpython-39/mnt/M3_Lab/Chiikawa/detection/DINO/models/dino/ops/src/vision.o	dacfd86d1ca6739f
+7	11809	1776173572870000000	/mnt/M3_Lab/Chiikawa/detection/DINO/models/dino/ops/build/temp.linux-x86_64-cpython-39/mnt/M3_Lab/Chiikawa/detection/DINO/models/dino/ops/src/cuda/ms_deform_attn_cuda.o	3f7da906fc44ae5b
