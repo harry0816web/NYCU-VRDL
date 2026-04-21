@@ -1,7 +1,7 @@
 # NYCU Computer Vision 2026 HW2
 
 - **Student ID** 112550097
-- **Name**: Your Name
+- **Name**: Hung-I Yang
 
 ## Introduction
 
