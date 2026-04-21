@@ -1,7 +1,7 @@
 # NYCU Computer Vision 2026 HW2
 
 - **Student ID** 112550097
-- **Name**: Your Name
+- **Name**: Hung-I Yang
 
 ## Introduction
 
@@ -54,7 +54,8 @@ python inference.py --checkpoint <your_checkpoint>
 
 ## Performance Snapshot
 
-1776765703846
+![Performance Snapshot](image/README/1776765703846.png)
+
 
 ## References
 
