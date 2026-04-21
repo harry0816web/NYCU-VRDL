@@ -27,7 +27,11 @@ def resize(image, target, size, max_size=None):
             min_original_size = float(min((w, h)))
             max_original_size = float(max((w, h)))
             if max_original_size / min_original_size * size > max_size:
-                size = int(round(max_size * min_original_size / max_original_size))
+                size = int(
+                    round(
+                        max_size *
+                        min_original_size /
+                        max_original_size))
 
         if (w <= h and w == size) or (h <= w and h == size):
             return h, w
@@ -53,13 +57,15 @@ def resize(image, target, size, max_size=None):
     if target is None:
         return rescaled_image, None
 
-    ratios = tuple(float(s) / float(s_orig) for s, s_orig in zip(rescaled_image.size, image.size))
+    ratios = tuple(float(s) / float(s_orig)
+                   for s, s_orig in zip(rescaled_image.size, image.size))
     ratio_width, ratio_height = ratios
 
     target = target.copy()
     if "boxes" in target:
         boxes = target["boxes"]
-        scaled_boxes = boxes * torch.as_tensor([ratio_width, ratio_height, ratio_width, ratio_height])
+        scaled_boxes = boxes * \
+            torch.as_tensor([ratio_width, ratio_height, ratio_width, ratio_height])
         target["boxes"] = scaled_boxes
 
     if "area" in target:
@@ -74,7 +80,13 @@ def resize(image, target, size, max_size=None):
 
 
 class ColorJitter(object):
-    def __init__(self, brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05, p=1.0):
+    def __init__(
+            self,
+            brightness=0.2,
+            contrast=0.2,
+            saturation=0.2,
+            hue=0.05,
+            p=1.0):
         self.jitter = T.ColorJitter(
             brightness=brightness,
             contrast=contrast,
@@ -116,8 +128,10 @@ class RandomResizeScale(object):
 
 
 def _filter_boxes(target, img_w, img_h, min_visibility=0.5):
-    """Clip boxes to image boundary and discard those with < min_visibility area remaining.
-    Applies the same keep mask to boxes, labels, area, and iscrowd simultaneously."""
+    """Clip boxes and discard low-visibility ones.
+
+    Applies the same keep mask to boxes, labels, area, and iscrowd.
+    """
     if target is None or "boxes" not in target or len(target["boxes"]) == 0:
         return target
     target = target.copy()
@@ -129,7 +143,10 @@ def _filter_boxes(target, img_w, img_h, min_visibility=0.5):
     clipped_areas = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
 
     valid_box = (boxes[:, 2] > boxes[:, 0]) & (boxes[:, 3] > boxes[:, 1])
-    visible_enough = (clipped_areas / orig_areas.clamp(min=1e-6)) >= min_visibility
+    visible_enough = (
+        clipped_areas /
+        orig_areas.clamp(
+            min=1e-6)) >= min_visibility
     keep = valid_box & visible_enough
 
     target["boxes"] = boxes[keep]
@@ -142,9 +159,16 @@ def _filter_boxes(target, img_w, img_h, min_visibility=0.5):
 
 
 class RandomRotation(object):
-    """Bbox-aware rotation + translation with compensatory scale-up (no black borders)."""
+    """Bbox-aware rotation + translation with compensatory scale-up."""
 
-    def __init__(self, degrees=10.0, translate=(0.1, 0.1), min_visibility=0.5, p=1.0):
+    def __init__(
+            self,
+            degrees=10.0,
+            translate=(
+                0.1,
+                0.1),
+            min_visibility=0.5,
+            p=1.0):
         self.degrees = degrees
         self.translate = translate
         self.min_visibility = min_visibility
@@ -165,7 +189,8 @@ class RandomRotation(object):
         img = F.affine(img, angle=angle, translate=[int(tx), int(ty)],
                        scale=scale, shear=0, fill=0)
 
-        if target is not None and "boxes" in target and len(target["boxes"]) > 0:
+        if target is not None and "boxes" in target and len(
+                target["boxes"]) > 0:
             target = target.copy()
             boxes = target["boxes"].clone().float()
             cx, cy = w / 2.0, h / 2.0
@@ -225,16 +250,20 @@ class RandomPerspective(object):
         half_d = self.distortion_scale * min(w, h)
 
         tl = [random.uniform(-half_d, half_d), random.uniform(-half_d, half_d)]
-        tr = [w - 1 + random.uniform(-half_d, half_d), random.uniform(-half_d, half_d)]
-        br = [w - 1 + random.uniform(-half_d, half_d), h - 1 + random.uniform(-half_d, half_d)]
-        bl = [random.uniform(-half_d, half_d), h - 1 + random.uniform(-half_d, half_d)]
+        tr = [w - 1 + random.uniform(-half_d, half_d),
+              random.uniform(-half_d, half_d)]
+        br = [w - 1 + random.uniform(-half_d, half_d),
+              h - 1 + random.uniform(-half_d, half_d)]
+        bl = [random.uniform(-half_d, half_d), h - 1 +
+              random.uniform(-half_d, half_d)]
 
         startpoints = [[0, 0], [w - 1, 0], [w - 1, h - 1], [0, h - 1]]
         endpoints = [tl, tr, br, bl]
 
         img = F.perspective(img, startpoints, endpoints, fill=0)
 
-        if target is not None and "boxes" in target and len(target["boxes"]) > 0:
+        if target is not None and "boxes" in target and len(
+                target["boxes"]) > 0:
             target = target.copy()
 
             src = np.array(startpoints, dtype=np.float64)
@@ -267,7 +296,7 @@ class RandomPerspective(object):
 
 
 class RandomCrop(object):
-    """Random crop with aspect-ratio preserved; drops bboxes with <min_visibility remaining."""
+    """Random crop preserving aspect ratio and minimum box visibility."""
 
     def __init__(self, scale=(0.6, 1.0), p=0.5, min_visibility=0.5):
         self.scale = scale
@@ -285,7 +314,8 @@ class RandomCrop(object):
         y0 = random.randint(0, h - ch) if h > ch else 0
         img = F.crop(img, y0, x0, ch, cw)
 
-        if target is not None and "boxes" in target and len(target["boxes"]) > 0:
+        if target is not None and "boxes" in target and len(
+                target["boxes"]) > 0:
             target = target.copy()
             boxes = target["boxes"].clone().float()
             boxes[:, 0::2] -= x0
@@ -401,7 +431,8 @@ class ConvertCocoPolysToMask(object):
         target["image_id"] = image_id
 
         area = torch.tensor([obj["area"] for obj in anno])
-        iscrowd = torch.tensor([obj["iscrowd"] if "iscrowd" in obj else 0 for obj in anno])
+        iscrowd = torch.tensor(
+            [obj["iscrowd"] if "iscrowd" in obj else 0 for obj in anno])
         target["area"] = area[keep]
         target["iscrowd"] = iscrowd[keep]
 
@@ -444,48 +475,77 @@ def make_coco_transforms(image_set, config=None):
     if image_set == "train":
         short_edge = config.get('train_short_edge', 320) if config else 320
         max_size = config.get('train_max_size', 640) if config else 640
-        scale_min = config.get('train_random_scale_min', 0.9) if config else 0.9
-        scale_max = config.get('train_random_scale_max', 1.0) if config else 1.0
+        scale_min = config.get(
+            'train_random_scale_min',
+            0.9) if config else 0.9
+        scale_max = config.get(
+            'train_random_scale_max',
+            1.0) if config else 1.0
 
         min_vis = config.get('augment_min_visibility', 0.5) if config else 0.5
         degrees = config.get('augment_degrees', 10.0) if config else 10.0
-        translate = config.get('augment_translate', [0.1, 0.1]) if config else [0.1, 0.1]
-        persp_scale = config.get('augment_perspective_scale', 0.1) if config else 0.1
+        translate = config.get(
+            'augment_translate', [
+                0.1, 0.1]) if config else [
+            0.1, 0.1]
+        persp_scale = config.get(
+            'augment_perspective_scale',
+            0.1) if config else 0.1
         persp_p = config.get('augment_perspective_p', 0.5) if config else 0.5
         blur_kernel = config.get('augment_blur_kernel', 5) if config else 5
-        blur_sigma = config.get('augment_blur_sigma', [0.1, 2.0]) if config else [0.1, 2.0]
+        blur_sigma = config.get(
+            'augment_blur_sigma', [
+                0.1, 2.0]) if config else [
+            0.1, 2.0]
         blur_p = config.get('augment_blur_p', 0.5) if config else 0.5
 
         iso_enabled = config.get('aug_iso_noise', False) if config else False
         iso_p = config.get('aug_iso_noise_p', 0.2) if config else 0.2
-        iso_intensity = config.get('aug_iso_noise_intensity', 0.05) if config else 0.05
+        iso_intensity = config.get(
+            'aug_iso_noise_intensity',
+            0.05) if config else 0.05
         crop_p = config.get('aug_crop_p', 0.5) if config else 0.5
-        crop_scale = config.get('aug_crop_scale', [0.6, 1.0]) if config else [0.6, 1.0]
-        color_jitter_p = config.get('aug_color_jitter_p', 1.0) if config else 1.0
+        crop_scale = config.get(
+            'aug_crop_scale', [
+                0.6, 1.0]) if config else [
+            0.6, 1.0]
+        color_jitter_p = config.get(
+            'aug_color_jitter_p',
+            1.0) if config else 1.0
         rot_p = config.get('aug_rotation_p', 1.0) if config else 1.0
 
         transforms_list = [
-            # Phase 1: Pixel-level transformations (lens-blur first, then sensor-noise)
+            # Phase 1: Pixel-level transformations (lens-blur first, then
+            # sensor-noise)
             ColorJitter(p=color_jitter_p),
-            GaussianBlur(kernel_size=blur_kernel, sigma=tuple(blur_sigma), p=blur_p),
+            GaussianBlur(
+                kernel_size=blur_kernel,
+                sigma=tuple(blur_sigma),
+                p=blur_p),
         ]
         if iso_enabled:
             transforms_list.append(ISONoise(p=iso_p, intensity=iso_intensity))
         transforms_list.extend([
-            # Phase 2: Geometric distortions (bbox-aware, with min_visibility filter)
+            # Phase 2: Geometric distortions (bbox-aware, with min_visibility
+            # filter)
             RandomRotation(degrees=degrees, translate=tuple(translate),
                            min_visibility=min_vis, p=rot_p),
             RandomPerspective(distortion_scale=persp_scale, p=persp_p,
                               min_visibility=min_vis),
 
-            # Phase 3: Spatial sampling (crop with min_visibility=0.5 to drop heavily-cut bboxes)
-            RandomCrop(scale=tuple(crop_scale), p=crop_p, min_visibility=min_vis),
+            # Phase 3: Spatial sampling (crop with min_visibility=0.5 to drop
+            # heavily-cut bboxes)
+            RandomCrop(
+                scale=tuple(crop_scale),
+                p=crop_p,
+                min_visibility=min_vis),
 
             # Phase 4: Resize to model input
             RandomResize([short_edge], max_size=max_size),
             RandomResizeScale(min_scale=scale_min, max_scale=scale_max),
 
-            # Phase 5: Final preprocessing (ToTensor + Normalize, normalized cxcywh boxes)
+            # Phase 5: Final preprocessing (ToTensor + Normalize, normalized
+            # cxcywh boxes)
             normalize,
         ])
         return Compose(transforms_list)
@@ -511,7 +571,12 @@ def build_dataset(image_set, config):
     }
 
     img_folder, ann_file = paths[image_set]
-    dataset = CocoDetection(img_folder, ann_file, transforms=make_coco_transforms(image_set, config))
+    dataset = CocoDetection(
+        img_folder,
+        ann_file,
+        transforms=make_coco_transforms(
+            image_set,
+            config))
     return dataset
 
 

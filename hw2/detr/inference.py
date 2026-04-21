@@ -63,7 +63,12 @@ def main(config_path, checkpoint_path, test_dir=None, output_path="pred.json",
         img_tensor, _ = transforms(img, None)
         samples.append((img_tensor, (orig_h, orig_w), image_id))
 
-    for batch_start in tqdm(range(0, len(samples), batch_size), desc="Running inference"):
+    for batch_start in tqdm(
+            range(
+                0,
+                len(samples),
+                batch_size),
+            desc="Running inference"):
         batch_samples = samples[batch_start: batch_start + batch_size]
         tensors, orig_sizes, image_ids = zip(*batch_samples)
 
@@ -103,10 +108,16 @@ def main(config_path, checkpoint_path, test_dir=None, output_path="pred.json",
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('DETR Inference')
     parser.add_argument('--config', default='config.json', type=str)
-    parser.add_argument('--checkpoint', required=True, type=str,
-                        help='path to trained checkpoint (e.g. output/best.pth)')
-    parser.add_argument('--test_dir', default=None, type=str,
-                        help='path to test images directory (default: data_path/test)')
+    parser.add_argument(
+        '--checkpoint',
+        required=True,
+        type=str,
+        help='path to trained checkpoint (e.g. output/best.pth)')
+    parser.add_argument(
+        '--test_dir',
+        default=None,
+        type=str,
+        help='path to test images directory (default: data_path/test)')
     parser.add_argument('--output', default='pred.json', type=str,
                         help='output json file path')
     parser.add_argument('--score_threshold', default=0.01, type=float,

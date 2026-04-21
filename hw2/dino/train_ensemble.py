@@ -54,7 +54,8 @@ def find_best_checkpoint(output_root: Path, seed: int) -> Path:
         f"Available contents: {[p.name for p in seed_dir.iterdir()]}")
 
 
-def train_single_seed(config_path: str, seed: int, base_output_dir: Path):
+def train_single_seed(config_path: str, seed: int, base_output_dir: Path,
+                      wandb_project: str = None):
     """Train one model by spawning a subprocess with a temp config."""
     with open(config_path, "r") as f:
         config = json.load(f)
@@ -62,8 +63,11 @@ def train_single_seed(config_path: str, seed: int, base_output_dir: Path):
     config["seed"] = seed
     config["output_dir"] = str(base_output_dir / f"seed_{seed}")
 
-    # Optionally tag wandb run
-    if config.get("wandb_project"):
+    # Set up wandb logging for this seed
+    if wandb_project:
+        config["wandb_project"] = wandb_project
+        config["wandb_run_name"] = f"seed_{seed}"
+    elif config.get("wandb_project"):
         config["wandb_run_name"] = f"seed_{seed}"
 
     # Write a temporary config file
@@ -72,9 +76,9 @@ def train_single_seed(config_path: str, seed: int, base_output_dir: Path):
     with open(tmp_config, "w") as f:
         json.dump(config, f, indent=2)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  Training seed={seed}  |  output -> {config['output_dir']}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     script_dir = Path(__file__).resolve().parent
     cmd = [sys.executable, str(script_dir / "train.py"),
@@ -82,16 +86,25 @@ def train_single_seed(config_path: str, seed: int, base_output_dir: Path):
 
     result = subprocess.run(cmd, cwd=str(script_dir))
     if result.returncode != 0:
-        print(f"[ERROR] Training failed for seed={seed} (exit code {result.returncode})")
+        print(
+            f"[ERROR] Training failed for seed={seed} (exit code {
+                result.returncode})")
         sys.exit(result.returncode)
 
     print(f"[OK] Training completed for seed={seed}")
 
 
-def run_ensemble_inference(config_path: str, seeds: list, base_output_dir: Path,
-                           iou_thr: float, skip_box_thr: float,
-                           score_threshold: float, ensemble_output: str,
-                           test_dir: str = None, batch_size: int = 1):
+def run_ensemble_inference(
+        config_path: str,
+        seeds: list,
+        base_output_dir: Path,
+        iou_thr: float,
+        skip_box_thr: float,
+        score_threshold: float,
+        ensemble_output: str,
+        test_dir: str = None,
+        batch_size: int = 1,
+        num_select: int = None):
     """Launch ensemble_inference.py with the checkpoints from all seeds."""
     checkpoint_paths = []
     for seed in seeds:
@@ -110,16 +123,20 @@ def run_ensemble_inference(config_path: str, seeds: list, base_output_dir: Path,
         "--score_threshold", str(score_threshold),
         "--batch_size", str(batch_size),
     ]
+    if num_select is not None:
+        cmd.extend(["--num_select", str(num_select)])
     if test_dir:
         cmd.extend(["--test_dir", test_dir])
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  Running WBF Ensemble Inference  ({len(seeds)} models)")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     result = subprocess.run(cmd, cwd=str(script_dir))
     if result.returncode != 0:
-        print(f"[ERROR] Ensemble inference failed (exit code {result.returncode})")
+        print(
+            f"[ERROR] Ensemble inference failed (exit code {
+                result.returncode})")
         sys.exit(result.returncode)
 
     print(f"\n[OK] Ensemble predictions saved to {ensemble_output}")
@@ -130,24 +147,42 @@ def main():
         description="Multi-seed DINO training + WBF ensemble inference")
 
     # --- Training args ---
-    parser.add_argument("--config", default="config.json", type=str,
-                        help="Path to base config.json (shared across all seeds)")
+    parser.add_argument(
+        "--config",
+        default="config.json",
+        type=str,
+        help="Path to base config.json (shared across all seeds)")
     parser.add_argument("--seeds", nargs="+", type=int, default=[42, 123, 7],
                         help="Random seeds to train (default: 42 123 7)")
     parser.add_argument("--output_dir", default=None, type=str,
                         help="Root output dir (default: config's output_dir)")
-    parser.add_argument("--skip_train", action="store_true",
-                        help="Skip training, only run ensemble on existing checkpoints")
+    parser.add_argument(
+        "--skip_train",
+        action="store_true",
+        help="Skip training, only run ensemble on existing checkpoints")
+
+    # --- Wandb args ---
+    parser.add_argument(
+        "--wandb_project",
+        default=None,
+        type=str,
+        help="Wandb project name (enables wandb logging for all seeds)")
 
     # --- Ensemble inference args ---
     parser.add_argument("--iou_thr", type=float, default=0.55,
                         help="WBF IoU threshold (default: 0.55)")
-    parser.add_argument("--skip_box_thr", type=float, default=0.0001,
-                        help="WBF minimum score to keep a box (default: 0.0001)")
+    parser.add_argument(
+        "--skip_box_thr",
+        type=float,
+        default=0.0001,
+        help="WBF minimum score to keep a box (default: 0.0001)")
     parser.add_argument("--score_threshold", type=float, default=0.01,
                         help="Final score threshold for output predictions")
     parser.add_argument("--ensemble_output", default="pred.json", type=str,
                         help="Output path for ensemble predictions")
+    parser.add_argument("--num_select", type=int, default=None,
+                        help="Top-k predictions per model for WBF "
+                             "(default: num_queries × num_classes)")
     parser.add_argument("--test_dir", default=None, type=str,
                         help="Test images directory (default: data_path/test)")
     parser.add_argument("--batch_size", type=int, default=1,
@@ -158,7 +193,9 @@ def main():
     # Resolve output directory
     with open(args.config, "r") as f:
         base_config = json.load(f)
-    base_output_dir = Path(args.output_dir or base_config.get("output_dir", "./output"))
+    base_output_dir = Path(
+        args.output_dir or base_config.get(
+            "output_dir", "./output"))
     base_output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Seeds: {args.seeds}")
@@ -168,8 +205,9 @@ def main():
     # ---- Phase 1: Train each seed ----
     if not args.skip_train:
         for i, seed in enumerate(args.seeds):
-            print(f"\n>>> Model {i+1}/{len(args.seeds)}  (seed={seed})")
-            train_single_seed(args.config, seed, base_output_dir)
+            print(f"\n>>> Model {i + 1}/{len(args.seeds)}  (seed={seed})")
+            train_single_seed(args.config, seed, base_output_dir,
+                              wandb_project=args.wandb_project)
     else:
         print("\n[SKIP] Training skipped (--skip_train). Using existing checkpoints.")
 
@@ -184,6 +222,7 @@ def main():
         ensemble_output=args.ensemble_output,
         test_dir=args.test_dir,
         batch_size=args.batch_size,
+        num_select=args.num_select,
     )
 
 

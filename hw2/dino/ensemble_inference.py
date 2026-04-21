@@ -125,7 +125,7 @@ def wbf_ensemble_per_image(models_boxes, models_scores, models_labels,
     """
     boxes_list = [b.tolist() for b in models_boxes]
     scores_list = [s.tolist() for s in models_scores]
-    labels_list = [l.tolist() for l in models_labels]
+    labels_list = [label.tolist() for label in models_labels]
 
     fused_boxes, fused_scores, fused_labels = weighted_boxes_fusion(
         boxes_list, scores_list, labels_list,
@@ -138,21 +138,30 @@ def wbf_ensemble_per_image(models_boxes, models_scores, models_labels,
 
 @torch.no_grad()
 def main(config_path, checkpoint_paths, test_dir=None, output_path="pred.json",
-         score_threshold=0.01, iou_thr=0.55, skip_box_thr=0.0001,
-         weights=None, batch_size=1):
+         score_threshold=0.0, iou_thr=0.55, skip_box_thr=0.0001,
+         weights=None, batch_size=1, num_select_override=None):
 
     with open(config_path, 'r') as f:
         config = json.load(f)
 
     device = torch.device(config["device"])
-    num_select = config.get('num_select', 300)
     num_models = len(checkpoint_paths)
+
+    # Default to config's num_select (= num_queries), since each query
+    # corresponds to one box position. Using more than num_queries just
+    # duplicates the same box with different class labels — pure noise.
+    if num_select_override is not None:
+        num_select = num_select_override
+    else:
+        num_select = config.get('num_select', 300)
+
+    print(f"num_select per model: {num_select}")
 
     # --- Load all models ---
     print(f"Loading {num_models} models...")
     models = []
     for i, ckpt_path in enumerate(checkpoint_paths):
-        print(f"  [{i+1}/{num_models}] {ckpt_path}")
+        print(f"  [{i + 1}/{num_models}] {ckpt_path}")
         model, _ = load_model(config, ckpt_path, device)
         models.append(model)
 
@@ -199,9 +208,12 @@ def main(config_path, checkpoint_paths, test_dir=None, output_path="pred.json",
             orig_h, orig_w = orig_sizes[img_idx]
 
             # Gather this image's predictions across all models
-            m_boxes = [per_model_preds[m][0][img_idx] for m in range(num_models)]
-            m_scores = [per_model_preds[m][1][img_idx] for m in range(num_models)]
-            m_labels = [per_model_preds[m][2][img_idx] for m in range(num_models)]
+            m_boxes = [per_model_preds[m][0][img_idx]
+                       for m in range(num_models)]
+            m_scores = [per_model_preds[m][1][img_idx]
+                        for m in range(num_models)]
+            m_labels = [per_model_preds[m][2][img_idx]
+                        for m in range(num_models)]
 
             fused_boxes, fused_scores, fused_labels = wbf_ensemble_per_image(
                 m_boxes, m_scores, m_labels,
@@ -217,7 +229,8 @@ def main(config_path, checkpoint_paths, test_dir=None, output_path="pred.json",
             fused_labels = fused_labels[keep]
 
             # Convert from normalised xyxy [0,1] to absolute pixel xywh
-            for box, score, label in zip(fused_boxes, fused_scores, fused_labels):
+            for box, score, label in zip(
+                    fused_boxes, fused_scores, fused_labels):
                 x1, y1, x2, y2 = box
                 abs_x1 = x1 * orig_w
                 abs_y1 = y1 * orig_h
@@ -248,24 +261,38 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('DINO WBF Ensemble Inference')
     parser.add_argument('--config', default='config.json', type=str,
                         help='Path to config.json')
-    parser.add_argument('--checkpoints', nargs='+', required=True, type=str,
-                        help='Paths to checkpoint files (e.g. best.pth from each seed)')
+    parser.add_argument(
+        '--checkpoints',
+        nargs='+',
+        required=True,
+        type=str,
+        help='Paths to checkpoint files (e.g. best.pth from each seed)')
     parser.add_argument('--test_dir', default=None, type=str,
                         help='Test images directory (default: data_path/test)')
     parser.add_argument('--output', default='pred.json', type=str,
                         help='Output prediction JSON path')
-    parser.add_argument('--score_threshold', default=0.01, type=float,
-                        help='Final score threshold for output')
+    parser.add_argument('--num_select', default=None, type=int,
+                        help='Top-k predictions per model per image '
+                             '(default: from config num_select)')
+    parser.add_argument(
+        '--score_threshold',
+        default=0.0,
+        type=float,
+        help='Final score threshold for output (default: 0.0, keep all)')
     parser.add_argument('--iou_thr', default=0.55, type=float,
                         help='WBF IoU threshold for merging overlapping boxes')
     parser.add_argument('--skip_box_thr', default=0.0001, type=float,
                         help='WBF minimum score to keep a box before fusion')
-    parser.add_argument('--weights', nargs='+', type=float, default=None,
-                        help='Per-model weights for WBF (default: equal weights)')
+    parser.add_argument(
+        '--weights',
+        nargs='+',
+        type=float,
+        default=None,
+        help='Per-model weights for WBF (default: equal weights)')
     parser.add_argument('--batch_size', default=1, type=int,
                         help='Inference batch size')
 
     args = parser.parse_args()
     main(args.config, args.checkpoints, args.test_dir, args.output,
          args.score_threshold, args.iou_thr, args.skip_box_thr,
-         args.weights, args.batch_size)
+         args.weights, args.batch_size, args.num_select)

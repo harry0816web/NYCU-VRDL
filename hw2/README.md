@@ -53,8 +53,8 @@ python inference.py --checkpoint <your_checkpoint>
 ```
 
 ## Performance Snapshot
+![1776765703846](image/README/1776765703846.png)
 
-Insert a screenshot of your leaderboard or validation performance here.
 
 ## References
 
@@ -62,3 +62,4 @@ This homework codebase is modified from the following repositories:
 
 - [DINO](https://github.com/IDEA-Research/DINO)
 - [DETR](https://github.com/facebookresearch/detr)
+

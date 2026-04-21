@@ -24,7 +24,11 @@ def resize(image, target, size, max_size=None):
             min_original_size = float(min((w, h)))
             max_original_size = float(max((w, h)))
             if max_original_size / min_original_size * size > max_size:
-                size = int(round(max_size * min_original_size / max_original_size))
+                size = int(
+                    round(
+                        max_size *
+                        min_original_size /
+                        max_original_size))
 
         if (w <= h and w == size) or (h <= w and h == size):
             return h, w
@@ -50,13 +54,15 @@ def resize(image, target, size, max_size=None):
     if target is None:
         return rescaled_image, None
 
-    ratios = tuple(float(s) / float(s_orig) for s, s_orig in zip(rescaled_image.size, image.size))
+    ratios = tuple(float(s) / float(s_orig)
+                   for s, s_orig in zip(rescaled_image.size, image.size))
     ratio_width, ratio_height = ratios
 
     target = target.copy()
     if "boxes" in target:
         boxes = target["boxes"]
-        scaled_boxes = boxes * torch.as_tensor([ratio_width, ratio_height, ratio_width, ratio_height])
+        scaled_boxes = boxes * \
+            torch.as_tensor([ratio_width, ratio_height, ratio_width, ratio_height])
         target["boxes"] = scaled_boxes
 
     if "area" in target:
@@ -177,7 +183,8 @@ class ConvertCocoPolysToMask(object):
         target["image_id"] = image_id
 
         area = torch.tensor([obj["area"] for obj in anno])
-        iscrowd = torch.tensor([obj["iscrowd"] if "iscrowd" in obj else 0 for obj in anno])
+        iscrowd = torch.tensor(
+            [obj["iscrowd"] if "iscrowd" in obj else 0 for obj in anno])
         target["area"] = area[keep]
         target["iscrowd"] = iscrowd[keep]
 
@@ -245,7 +252,10 @@ def build_dataset(image_set, config):
     }
 
     img_folder, ann_file = paths[image_set]
-    dataset = CocoDetection(img_folder, ann_file, transforms=make_coco_transforms(image_set))
+    dataset = CocoDetection(
+        img_folder,
+        ann_file,
+        transforms=make_coco_transforms(image_set))
     return dataset
 
 

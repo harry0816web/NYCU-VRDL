@@ -252,5 +252,11 @@ def accuracy(output, target, topk=(1,)):
     return res
 
 
-def interpolate(input, size=None, scale_factor=None, mode="nearest", align_corners=None):
-    return torch.nn.functional.interpolate(input, size, scale_factor, mode, align_corners)
+def interpolate(
+        input,
+        size=None,
+        scale_factor=None,
+        mode="nearest",
+        align_corners=None):
+    return torch.nn.functional.interpolate(
+        input, size, scale_factor, mode, align_corners)

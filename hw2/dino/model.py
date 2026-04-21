@@ -54,35 +54,48 @@ def _get_activation_fn(activation, d_model=256, batch_dim=0):
 
 def gen_sineembed_for_position(pos_tensor, num_pos_feats=128):
     scale = 2 * math.pi
-    dim_t = torch.arange(num_pos_feats, dtype=torch.float32, device=pos_tensor.device)
+    dim_t = torch.arange(
+        num_pos_feats,
+        dtype=torch.float32,
+        device=pos_tensor.device)
     dim_t = 10000 ** (2 * (dim_t // 2) / num_pos_feats)
     x_embed = pos_tensor[:, :, 0] * scale
     y_embed = pos_tensor[:, :, 1] * scale
     pos_x = x_embed[:, :, None] / dim_t
     pos_y = y_embed[:, :, None] / dim_t
-    pos_x = torch.stack((pos_x[:, :, 0::2].sin(), pos_x[:, :, 1::2].cos()), dim=3).flatten(2)
-    pos_y = torch.stack((pos_y[:, :, 0::2].sin(), pos_y[:, :, 1::2].cos()), dim=3).flatten(2)
+    pos_x = torch.stack(
+        (pos_x[:, :, 0::2].sin(), pos_x[:, :, 1::2].cos()), dim=3).flatten(2)
+    pos_y = torch.stack(
+        (pos_y[:, :, 0::2].sin(), pos_y[:, :, 1::2].cos()), dim=3).flatten(2)
     if pos_tensor.size(-1) == 2:
         pos = torch.cat((pos_y, pos_x), dim=2)
     elif pos_tensor.size(-1) == 4:
         w_embed = pos_tensor[:, :, 2] * scale
         pos_w = w_embed[:, :, None] / dim_t
-        pos_w = torch.stack((pos_w[:, :, 0::2].sin(), pos_w[:, :, 1::2].cos()), dim=3).flatten(2)
+        pos_w = torch.stack(
+            (pos_w[:, :, 0::2].sin(), pos_w[:, :, 1::2].cos()), dim=3).flatten(2)
         h_embed = pos_tensor[:, :, 3] * scale
         pos_h = h_embed[:, :, None] / dim_t
-        pos_h = torch.stack((pos_h[:, :, 0::2].sin(), pos_h[:, :, 1::2].cos()), dim=3).flatten(2)
+        pos_h = torch.stack(
+            (pos_h[:, :, 0::2].sin(), pos_h[:, :, 1::2].cos()), dim=3).flatten(2)
         pos = torch.cat((pos_y, pos_x, pos_w, pos_h), dim=2)
     else:
-        raise ValueError("Unknown pos_tensor shape(-1):{}".format(pos_tensor.size(-1)))
+        raise ValueError(
+            "Unknown pos_tensor shape(-1):{}".format(pos_tensor.size(-1)))
     return pos
 
 
-def gen_encoder_output_proposals(memory, memory_padding_mask, spatial_shapes, learnedwh=None):
+def gen_encoder_output_proposals(
+        memory,
+        memory_padding_mask,
+        spatial_shapes,
+        learnedwh=None):
     N_, S_, C_ = memory.shape
     proposals = []
     _cur = 0
     for lvl, (H_, W_) in enumerate(spatial_shapes):
-        mask_flatten_ = memory_padding_mask[:, _cur:(_cur + H_ * W_)].view(N_, H_, W_, 1)
+        mask_flatten_ = memory_padding_mask[:, _cur:(
+            _cur + H_ * W_)].view(N_, H_, W_, 1)
         valid_H = torch.sum(~mask_flatten_[:, :, 0, 0], 1)
         valid_W = torch.sum(~mask_flatten_[:, 0, :, 0], 1)
         grid_y, grid_x = torch.meshgrid(
@@ -90,7 +103,8 @@ def gen_encoder_output_proposals(memory, memory_padding_mask, spatial_shapes, le
             torch.linspace(0, W_ - 1, W_, dtype=torch.float32, device=memory.device),
             indexing='ij')
         grid = torch.cat([grid_x.unsqueeze(-1), grid_y.unsqueeze(-1)], -1)
-        scale = torch.cat([valid_W.unsqueeze(-1), valid_H.unsqueeze(-1)], 1).view(N_, 1, 1, 2)
+        scale = torch.cat(
+            [valid_W.unsqueeze(-1), valid_H.unsqueeze(-1)], 1).view(N_, 1, 1, 2)
         grid = (grid.unsqueeze(0).expand(N_, -1, -1, -1) + 0.5) / scale
         if learnedwh is not None:
             wh = torch.ones_like(grid) * learnedwh.sigmoid() * (2.0 ** lvl)
@@ -100,13 +114,18 @@ def gen_encoder_output_proposals(memory, memory_padding_mask, spatial_shapes, le
         proposals.append(proposal)
         _cur += (H_ * W_)
     output_proposals = torch.cat(proposals, 1)
-    output_proposals_valid = ((output_proposals > 0.01) & (output_proposals < 0.99)).all(-1, keepdim=True)
+    output_proposals_valid = ((output_proposals > 0.01) & (
+        output_proposals < 0.99)).all(-1, keepdim=True)
     output_proposals = torch.log(output_proposals / (1 - output_proposals))
-    output_proposals = output_proposals.masked_fill(memory_padding_mask.unsqueeze(-1), float('inf'))
-    output_proposals = output_proposals.masked_fill(~output_proposals_valid, float('inf'))
+    output_proposals = output_proposals.masked_fill(
+        memory_padding_mask.unsqueeze(-1), float('inf'))
+    output_proposals = output_proposals.masked_fill(
+        ~output_proposals_valid, float('inf'))
     output_memory = memory
-    output_memory = output_memory.masked_fill(memory_padding_mask.unsqueeze(-1), float(0))
-    output_memory = output_memory.masked_fill(~output_proposals_valid, float(0))
+    output_memory = output_memory.masked_fill(
+        memory_padding_mask.unsqueeze(-1), float(0))
+    output_memory = output_memory.masked_fill(
+        ~output_proposals_valid, float(0))
     return output_memory, output_proposals
 
 
@@ -122,8 +141,13 @@ def _get_clones(module, N, layer_share=False):
 # ===========================================================================
 
 class PositionEmbeddingSineHW(nn.Module):
-    def __init__(self, num_pos_feats=64, temperatureH=10000, temperatureW=10000,
-                 normalize=False, scale=None):
+    def __init__(
+            self,
+            num_pos_feats=64,
+            temperatureH=10000,
+            temperatureW=10000,
+            normalize=False,
+            scale=None):
         super().__init__()
         self.num_pos_feats = num_pos_feats
         self.temperatureH = temperatureH
@@ -146,14 +170,22 @@ class PositionEmbeddingSineHW(nn.Module):
             eps = 1e-6
             y_embed = y_embed / (y_embed[:, -1:, :] + eps) * self.scale
             x_embed = x_embed / (x_embed[:, :, -1:] + eps) * self.scale
-        dim_tx = torch.arange(self.num_pos_feats, dtype=torch.float32, device=x.device)
+        dim_tx = torch.arange(
+            self.num_pos_feats,
+            dtype=torch.float32,
+            device=x.device)
         dim_tx = self.temperatureW ** (2 * (dim_tx // 2) / self.num_pos_feats)
         pos_x = x_embed[:, :, :, None] / dim_tx
-        dim_ty = torch.arange(self.num_pos_feats, dtype=torch.float32, device=x.device)
+        dim_ty = torch.arange(
+            self.num_pos_feats,
+            dtype=torch.float32,
+            device=x.device)
         dim_ty = self.temperatureH ** (2 * (dim_ty // 2) / self.num_pos_feats)
         pos_y = y_embed[:, :, :, None] / dim_ty
-        pos_x = torch.stack((pos_x[:, :, :, 0::2].sin(), pos_x[:, :, :, 1::2].cos()), dim=4).flatten(3)
-        pos_y = torch.stack((pos_y[:, :, :, 0::2].sin(), pos_y[:, :, :, 1::2].cos()), dim=4).flatten(3)
+        pos_x = torch.stack(
+            (pos_x[:, :, :, 0::2].sin(), pos_x[:, :, :, 1::2].cos()), dim=4).flatten(3)
+        pos_y = torch.stack(
+            (pos_y[:, :, :, 0::2].sin(), pos_y[:, :, :, 1::2].cos()), dim=4).flatten(3)
         pos = torch.cat((pos_y, pos_x), dim=3).permute(0, 3, 1, 2)
         return pos
 
@@ -193,13 +225,19 @@ class BackboneBase(nn.Module):
                  num_channels: list, return_interm_indices: list):
         super().__init__()
         for name, parameter in backbone.named_parameters():
-            if not train_backbone or ('layer2' not in name and 'layer3' not in name
-                                      and 'layer4' not in name):
+            if not train_backbone or (
+                'layer2' not in name
+                and 'layer3' not in name
+                and 'layer4' not in name
+            ):
                 parameter.requires_grad_(False)
         return_layers = {}
         for idx, layer_index in enumerate(return_interm_indices):
-            return_layers["layer{}".format(5 - len(return_interm_indices) + idx)] = "{}".format(layer_index)
-        self.body = IntermediateLayerGetter(backbone, return_layers=return_layers)
+            return_layers["layer{}".format(5 -
+                                           len(return_interm_indices) +
+                                           idx)] = "{}".format(layer_index)
+        self.body = IntermediateLayerGetter(
+            backbone, return_layers=return_layers)
         self.num_channels = num_channels
 
     def forward(self, tensor_list: NestedTensor):
@@ -208,7 +246,8 @@ class BackboneBase(nn.Module):
         for name, x in xs.items():
             m = tensor_list.mask
             assert m is not None
-            mask = F.interpolate(m[None].float(), size=x.shape[-2:]).to(torch.bool)[0]
+            mask = F.interpolate(m[None].float(),
+                                 size=x.shape[-2:]).to(torch.bool)[0]
             out[name] = NestedTensor(x, mask)
         return out
 
@@ -270,8 +309,15 @@ class DeformableTransformerEncoderLayer(nn.Module):
 
     def forward(self, src, pos, reference_points, spatial_shapes,
                 level_start_index, key_padding_mask=None):
-        src2 = self.self_attn(self.with_pos_embed(src, pos), reference_points,
-                              src, spatial_shapes, level_start_index, key_padding_mask)
+        src2 = self.self_attn(
+            self.with_pos_embed(
+                src,
+                pos),
+            reference_points,
+            src,
+            spatial_shapes,
+            level_start_index,
+            key_padding_mask)
         src = src + self.dropout1(src2)
         src = self.norm1(src)
         src = self.forward_ffn(src)
@@ -292,12 +338,14 @@ class DeformableTransformerDecoderLayer(nn.Module):
         self.dropout1 = nn.Dropout(dropout)
         self.norm1 = nn.LayerNorm(d_model)
         # self attention
-        self.self_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout)
+        self.self_attn = nn.MultiheadAttention(
+            d_model, n_heads, dropout=dropout)
         self.dropout2 = nn.Dropout(dropout)
         self.norm2 = nn.LayerNorm(d_model)
         # ffn
         self.linear1 = nn.Linear(d_model, d_ffn)
-        self.activation = _get_activation_fn(activation, d_model=d_ffn, batch_dim=1)
+        self.activation = _get_activation_fn(
+            activation, d_model=d_ffn, batch_dim=1)
         self.dropout3 = nn.Dropout(dropout)
         self.linear2 = nn.Linear(d_ffn, d_model)
         self.dropout4 = nn.Dropout(dropout)
@@ -347,15 +395,26 @@ class DeformableTransformerDecoderLayer(nn.Module):
             if funcname == 'ffn':
                 tgt = self.forward_ffn(tgt)
             elif funcname == 'ca':
-                tgt = self.forward_ca(tgt, tgt_query_pos, tgt_reference_points,
-                                      memory, memory_key_padding_mask,
-                                      memory_level_start_index, memory_spatial_shapes,
-                                      memory_pos)
+                tgt = self.forward_ca(
+                    tgt,
+                    tgt_query_pos,
+                    tgt_reference_points,
+                    memory,
+                    memory_key_padding_mask,
+                    memory_level_start_index,
+                    memory_spatial_shapes,
+                    memory_pos)
             elif funcname == 'sa':
-                tgt = self.forward_sa(tgt, tgt_query_pos, tgt_reference_points,
-                                      memory, memory_key_padding_mask,
-                                      memory_level_start_index, memory_spatial_shapes,
-                                      memory_pos, self_attn_mask)
+                tgt = self.forward_sa(
+                    tgt,
+                    tgt_query_pos,
+                    tgt_reference_points,
+                    memory,
+                    memory_key_padding_mask,
+                    memory_level_start_index,
+                    memory_spatial_shapes,
+                    memory_pos,
+                    self_attn_mask)
         return tgt
 
 
@@ -365,7 +424,8 @@ class TransformerEncoder(nn.Module):
                  enc_layer_share=False, two_stage_type='no'):
         super().__init__()
         if num_layers > 0:
-            self.layers = _get_clones(encoder_layer, num_layers, layer_share=enc_layer_share)
+            self.layers = _get_clones(
+                encoder_layer, num_layers, layer_share=enc_layer_share)
         else:
             self.layers = []
             del encoder_layer
@@ -384,8 +444,10 @@ class TransformerEncoder(nn.Module):
                 torch.linspace(0.5, H_ - 0.5, H_, dtype=torch.float32, device=device),
                 torch.linspace(0.5, W_ - 0.5, W_, dtype=torch.float32, device=device),
                 indexing='ij')
-            ref_y = ref_y.reshape(-1)[None] / (valid_ratios[:, None, lvl, 1] * H_)
-            ref_x = ref_x.reshape(-1)[None] / (valid_ratios[:, None, lvl, 0] * W_)
+            ref_y = ref_y.reshape(-1)[None] / \
+                (valid_ratios[:, None, lvl, 1] * H_)
+            ref_x = ref_x.reshape(-1)[None] / \
+                (valid_ratios[:, None, lvl, 0] * W_)
             ref = torch.stack((ref_x, ref_y), -1)
             reference_points_list.append(ref)
         reference_points = torch.cat(reference_points_list, 1)
@@ -403,14 +465,19 @@ class TransformerEncoder(nn.Module):
         intermediate_ref = []
         for layer_id, layer in enumerate(self.layers):
             if self.deformable_encoder:
-                output = layer(src=output, pos=pos, reference_points=reference_points,
-                               spatial_shapes=spatial_shapes,
-                               level_start_index=level_start_index,
-                               key_padding_mask=key_padding_mask)
+                output = layer(
+                    src=output,
+                    pos=pos,
+                    reference_points=reference_points,
+                    spatial_shapes=spatial_shapes,
+                    level_start_index=level_start_index,
+                    key_padding_mask=key_padding_mask)
             else:
-                output = layer(src=output.transpose(0, 1),
-                               pos=pos.transpose(0, 1),
-                               key_padding_mask=key_padding_mask).transpose(0, 1)
+                output = layer(
+                    src=output.transpose(
+                        0, 1), pos=pos.transpose(
+                        0, 1), key_padding_mask=key_padding_mask).transpose(
+                    0, 1)
         if self.norm is not None:
             output = self.norm(output)
         return output, None, None
@@ -425,7 +492,8 @@ class TransformerDecoder(nn.Module):
                  dec_layer_share=False, use_detached_boxes_dec_out=False):
         super().__init__()
         if num_layers > 0:
-            self.layers = _get_clones(decoder_layer, num_layers, layer_share=dec_layer_share)
+            self.layers = _get_clones(
+                decoder_layer, num_layers, layer_share=dec_layer_share)
         else:
             self.layers = []
         self.num_layers = num_layers
@@ -437,7 +505,8 @@ class TransformerDecoder(nn.Module):
         self.d_model = d_model
         self.deformable_decoder = deformable_decoder
 
-        self.ref_point_head = MLP(query_dim // 2 * d_model, d_model, d_model, 2)
+        self.ref_point_head = MLP(
+            query_dim // 2 * d_model, d_model, d_model, 2)
         if not deformable_decoder:
             self.query_pos_sine_scale = MLP(d_model, d_model, d_model, 2)
         else:
@@ -458,10 +527,19 @@ class TransformerDecoder(nn.Module):
         self.dec_layer_number = dec_layer_number
         self.rm_detach = None
 
-    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None,
-                tgt_key_padding_mask=None, memory_key_padding_mask=None,
-                pos=None, refpoints_unsigmoid=None,
-                level_start_index=None, spatial_shapes=None, valid_ratios=None):
+    def forward(
+            self,
+            tgt,
+            memory,
+            tgt_mask=None,
+            memory_mask=None,
+            tgt_key_padding_mask=None,
+            memory_key_padding_mask=None,
+            pos=None,
+            refpoints_unsigmoid=None,
+            level_start_index=None,
+            spatial_shapes=None,
+            valid_ratios=None):
         output = tgt
         intermediate = []
         reference_points = refpoints_unsigmoid.sigmoid()
@@ -475,7 +553,9 @@ class TransformerDecoder(nn.Module):
                         * torch.cat([valid_ratios, valid_ratios], -1)[None, :])
                 else:
                     assert reference_points.shape[-1] == 2
-                    reference_points_input = reference_points[:, :, None] * valid_ratios[None, :]
+                    reference_points_input = (
+                        reference_points[:, :, None] * valid_ratios[None, :]
+                    )
                 query_sine_embed = gen_sineembed_for_position(
                     reference_points_input[:, :, 0, :], self.d_model // 2)
             else:
@@ -484,10 +564,14 @@ class TransformerDecoder(nn.Module):
                 reference_points_input = None
 
             raw_query_pos = self.ref_point_head(query_sine_embed)
-            pos_scale = self.query_scale(output) if self.query_scale is not None else 1
+            pos_scale = self.query_scale(
+                output) if self.query_scale is not None else 1
             query_pos = pos_scale * raw_query_pos
             if not self.deformable_decoder:
-                query_sine_embed = query_sine_embed[..., :self.d_model] * self.query_pos_sine_scale(output)
+                query_sine_embed = (
+                    query_sine_embed[..., :self.d_model]
+                    * self.query_pos_sine_scale(output)
+                )
 
             output = layer(
                 tgt=output,
@@ -580,13 +664,15 @@ class DeformableTransformer(nn.Module):
 
         if num_feature_levels > 1:
             if self.num_encoder_layers > 0:
-                self.level_embed = nn.Parameter(torch.Tensor(num_feature_levels, d_model))
+                self.level_embed = nn.Parameter(
+                    torch.Tensor(num_feature_levels, d_model))
             else:
                 self.level_embed = None
 
         self.learnable_tgt_init = True
         self.embed_init_tgt = embed_init_tgt
-        if (two_stage_type != 'no' and embed_init_tgt) or (two_stage_type == 'no'):
+        if (two_stage_type != 'no' and embed_init_tgt) or (
+                two_stage_type == 'no'):
             self.tgt_embed = nn.Embedding(self.num_queries, d_model)
             nn.init.normal_(self.tgt_embed.weight.data)
         else:
@@ -603,7 +689,8 @@ class DeformableTransformer(nn.Module):
             else:
                 self.two_stage_wh_embedding = None
             if two_stage_add_query_num > 0:
-                self.tgt_embed = nn.Embedding(self.two_stage_add_query_num, d_model)
+                self.tgt_embed = nn.Embedding(
+                    self.two_stage_add_query_num, d_model)
 
         if two_stage_type == 'no':
             self.init_ref_points(num_queries)
@@ -624,7 +711,8 @@ class DeformableTransformer(nn.Module):
         if self.num_feature_levels > 1 and self.level_embed is not None:
             nn.init.normal_(self.level_embed)
         if self.two_stage_learn_wh:
-            nn.init.constant_(self.two_stage_wh_embedding.weight, math.log(0.05 / (1 - 0.05)))
+            nn.init.constant_(self.two_stage_wh_embedding.weight,
+                              math.log(0.05 / (1 - 0.05)))
 
     def get_valid_ratio(self, mask):
         _, H, W = mask.shape
@@ -643,19 +731,28 @@ class DeformableTransformer(nn.Module):
                 self.refpoint_embed.weight.data[:, :2])
             self.refpoint_embed.weight.data[:, :2].requires_grad = False
 
-    def forward(self, srcs, masks, refpoint_embed, pos_embeds, tgt, attn_mask=None):
+    def forward(
+            self,
+            srcs,
+            masks,
+            refpoint_embed,
+            pos_embeds,
+            tgt,
+            attn_mask=None):
         src_flatten = []
         mask_flatten = []
         lvl_pos_embed_flatten = []
         spatial_shapes = []
-        for lvl, (src, mask, pos_embed) in enumerate(zip(srcs, masks, pos_embeds)):
+        for lvl, (src, mask, pos_embed) in enumerate(
+                zip(srcs, masks, pos_embeds)):
             bs, c, h, w = src.shape
             spatial_shapes.append((h, w))
             src = src.flatten(2).transpose(1, 2)
             mask = mask.flatten(1)
             pos_embed = pos_embed.flatten(2).transpose(1, 2)
             if self.num_feature_levels > 1 and self.level_embed is not None:
-                lvl_pos_embed = pos_embed + self.level_embed[lvl].view(1, 1, -1)
+                lvl_pos_embed = pos_embed + \
+                    self.level_embed[lvl].view(1, 1, -1)
             else:
                 lvl_pos_embed = pos_embed
             lvl_pos_embed_flatten.append(lvl_pos_embed)
@@ -664,24 +761,38 @@ class DeformableTransformer(nn.Module):
         src_flatten = torch.cat(src_flatten, 1)
         mask_flatten = torch.cat(mask_flatten, 1)
         lvl_pos_embed_flatten = torch.cat(lvl_pos_embed_flatten, 1)
-        spatial_shapes = torch.as_tensor(spatial_shapes, dtype=torch.long, device=src_flatten.device)
+        spatial_shapes = torch.as_tensor(
+            spatial_shapes,
+            dtype=torch.long,
+            device=src_flatten.device)
         level_start_index = torch.cat((spatial_shapes.new_zeros((1,)),
                                        spatial_shapes.prod(1).cumsum(0)[:-1]))
         valid_ratios = torch.stack([self.get_valid_ratio(m) for m in masks], 1)
 
         memory, enc_intermediate_output, enc_intermediate_refpoints = self.encoder(
-            src_flatten, pos=lvl_pos_embed_flatten,
-            level_start_index=level_start_index, spatial_shapes=spatial_shapes,
-            valid_ratios=valid_ratios, key_padding_mask=mask_flatten)
+            src_flatten,
+            pos=lvl_pos_embed_flatten,
+            level_start_index=level_start_index,
+            spatial_shapes=spatial_shapes,
+            valid_ratios=valid_ratios,
+            key_padding_mask=mask_flatten,
+        )
 
         if self.two_stage_type == 'standard':
-            input_hw = self.two_stage_wh_embedding.weight[0] if self.two_stage_learn_wh else None
+            input_hw = (
+                self.two_stage_wh_embedding.weight[0]
+                if self.two_stage_learn_wh
+                else None
+            )
             output_memory, output_proposals = gen_encoder_output_proposals(
                 memory, mask_flatten, spatial_shapes, input_hw)
-            output_memory = self.enc_output_norm(self.enc_output(output_memory))
+            output_memory = self.enc_output_norm(
+                self.enc_output(output_memory))
 
-            enc_outputs_class_unselected = self.enc_out_class_embed(output_memory)
-            enc_outputs_coord_unselected = self.enc_out_bbox_embed(output_memory) + output_proposals
+            enc_outputs_class_unselected = self.enc_out_class_embed(
+                output_memory)
+            enc_outputs_coord_unselected = self.enc_out_bbox_embed(
+                output_memory) + output_proposals
             topk = self.num_queries
             topk_proposals = torch.topk(
                 enc_outputs_class_unselected.max(-1)[0], topk, dim=1)[1]
@@ -698,27 +809,34 @@ class DeformableTransformer(nn.Module):
                 output_memory, 1,
                 topk_proposals.unsqueeze(-1).repeat(1, 1, self.d_model))
             if self.embed_init_tgt:
-                tgt_ = self.tgt_embed.weight[:, None, :].repeat(1, bs, 1).transpose(0, 1)
+                tgt_ = self.tgt_embed.weight[:, None, :].repeat(
+                    1, bs, 1).transpose(0, 1)
             else:
                 tgt_ = tgt_undetach.detach()
 
             if refpoint_embed is not None:
-                refpoint_embed = torch.cat([refpoint_embed, refpoint_embed_], dim=1)
+                refpoint_embed = torch.cat(
+                    [refpoint_embed, refpoint_embed_], dim=1)
                 tgt = torch.cat([tgt, tgt_], dim=1)
             else:
                 refpoint_embed, tgt = refpoint_embed_, tgt_
 
         elif self.two_stage_type == 'no':
-            tgt_ = self.tgt_embed.weight[:, None, :].repeat(1, bs, 1).transpose(0, 1)
-            refpoint_embed_ = self.refpoint_embed.weight[:, None, :].repeat(1, bs, 1).transpose(0, 1)
+            tgt_ = self.tgt_embed.weight[:, None, :].repeat(
+                1, bs, 1).transpose(0, 1)
+            refpoint_embed_ = self.refpoint_embed.weight[:, None, :].repeat(
+                1, bs, 1).transpose(0, 1)
             if refpoint_embed is not None:
-                refpoint_embed = torch.cat([refpoint_embed, refpoint_embed_], dim=1)
+                refpoint_embed = torch.cat(
+                    [refpoint_embed, refpoint_embed_], dim=1)
                 tgt = torch.cat([tgt, tgt_], dim=1)
             else:
                 refpoint_embed, tgt = refpoint_embed_, tgt_
             init_box_proposal = refpoint_embed_.sigmoid()
         else:
-            raise NotImplementedError("unknown two_stage_type {}".format(self.two_stage_type))
+            raise NotImplementedError(
+                "unknown two_stage_type {}".format(
+                    self.two_stage_type))
 
         hs, references = self.decoder(
             tgt=tgt.transpose(0, 1), memory=memory.transpose(0, 1),
@@ -741,7 +859,13 @@ class DeformableTransformer(nn.Module):
 # DN (Denoising) Components
 # ===========================================================================
 
-def prepare_for_cdn(dn_args, training, num_queries, num_classes, hidden_dim, label_enc):
+def prepare_for_cdn(
+        dn_args,
+        training,
+        num_queries,
+        num_classes,
+        hidden_dim,
+        label_enc):
     if training:
         targets, dn_number, label_noise_ratio, box_noise_scale = dn_args
         dn_number = dn_number * 2
@@ -774,14 +898,19 @@ def prepare_for_cdn(dn_args, training, num_queries, num_classes, hidden_dim, lab
 
         if label_noise_ratio > 0:
             p = torch.rand_like(known_labels_expaned.float())
-            chosen_indice = torch.nonzero(p < (label_noise_ratio * 0.5)).view(-1)
+            chosen_indice = torch.nonzero(
+                p < (label_noise_ratio * 0.5)).view(-1)
             new_label = torch.randint_like(chosen_indice, 0, num_classes)
             known_labels_expaned.scatter_(0, chosen_indice, new_label)
         single_pad = int(max(known_num))
         pad_size = int(single_pad * 2 * dn_number)
 
-        positive_idx = torch.tensor(range(len(boxes))).long().cuda().unsqueeze(0).repeat(dn_number, 1)
-        positive_idx += (torch.tensor(range(dn_number)) * len(boxes) * 2).long().cuda().unsqueeze(1)
+        positive_idx = torch.tensor(
+            range(
+                len(boxes))).long().cuda().unsqueeze(0).repeat(
+            dn_number, 1)
+        positive_idx += (torch.tensor(range(dn_number)) *
+                         len(boxes) * 2).long().cuda().unsqueeze(1)
         positive_idx = positive_idx.flatten()
         negative_idx = positive_idx + len(boxes)
         if box_noise_scale > 0:
@@ -796,9 +925,11 @@ def prepare_for_cdn(dn_args, training, num_queries, num_classes, hidden_dim, lab
             rand_part = torch.rand_like(known_bboxs)
             rand_part[negative_idx] += 1.0
             rand_part *= rand_sign
-            known_bbox_ = known_bbox_ + torch.mul(rand_part, diff).cuda() * box_noise_scale
+            known_bbox_ = known_bbox_ + \
+                torch.mul(rand_part, diff).cuda() * box_noise_scale
             known_bbox_ = known_bbox_.clamp(min=0.0, max=1.0)
-            known_bbox_expand[:, :2] = (known_bbox_[:, :2] + known_bbox_[:, 2:]) / 2
+            known_bbox_expand[:, :2] = (
+                known_bbox_[:, :2] + known_bbox_[:, 2:]) / 2
             known_bbox_expand[:, 2:] = known_bbox_[:, 2:] - known_bbox_[:, :2]
 
         m = known_labels_expaned.long().to('cuda')
@@ -813,12 +944,16 @@ def prepare_for_cdn(dn_args, training, num_queries, num_classes, hidden_dim, lab
 
         map_known_indice = torch.tensor([]).to('cuda')
         if len(known_num):
-            map_known_indice = torch.cat([torch.tensor(range(num)) for num in known_num])
             map_known_indice = torch.cat(
-                [map_known_indice + single_pad * i for i in range(2 * dn_number)]).long()
+                [torch.tensor(range(num)) for num in known_num])
+            map_known_indice = torch.cat(
+                [map_known_indice + single_pad * i for i in range(2 * dn_number)]
+            ).long()
         if len(known_bid):
-            input_query_label[(known_bid.long(), map_known_indice)] = input_label_embed
-            input_query_bbox[(known_bid.long(), map_known_indice)] = input_bbox_embed
+            input_query_label[(known_bid.long(),
+                               map_known_indice)] = input_label_embed
+            input_query_bbox[(known_bid.long(),
+                              map_known_indice)] = input_bbox_embed
 
         tgt_size = pad_size + num_queries
         attn_mask = torch.ones(tgt_size, tgt_size).to('cuda') < 0
@@ -843,7 +978,12 @@ def prepare_for_cdn(dn_args, training, num_queries, num_classes, hidden_dim, lab
     return input_query_label, input_query_bbox, attn_mask, dn_meta
 
 
-def dn_post_process(outputs_class, outputs_coord, dn_meta, aux_loss, _set_aux_loss):
+def dn_post_process(
+        outputs_class,
+        outputs_coord,
+        dn_meta,
+        aux_loss,
+        _set_aux_loss):
     if dn_meta and dn_meta['pad_size'] > 0:
         output_known_class = outputs_class[:, :, :dn_meta['pad_size'], :]
         output_known_coord = outputs_coord[:, :, :dn_meta['pad_size'], :]
@@ -852,7 +992,8 @@ def dn_post_process(outputs_class, outputs_coord, dn_meta, aux_loss, _set_aux_lo
         out = {'pred_logits': output_known_class[-1],
                'pred_boxes': output_known_coord[-1]}
         if aux_loss:
-            out['aux_outputs'] = _set_aux_loss(output_known_class, output_known_coord)
+            out['aux_outputs'] = _set_aux_loss(
+                output_known_class, output_known_coord)
         dn_meta['output_known_lbs_bboxes'] = out
     return outputs_class, outputs_coord
 
@@ -894,9 +1035,17 @@ class DINO(nn.Module):
                     nn.Conv2d(in_channels, hidden_dim, kernel_size=1),
                     nn.GroupNorm(32, hidden_dim)))
             for _ in range(num_feature_levels - num_backbone_outs):
-                input_proj_list.append(nn.Sequential(
-                    nn.Conv2d(in_channels, hidden_dim, kernel_size=3, stride=2, padding=1),
-                    nn.GroupNorm(32, hidden_dim)))
+                input_proj_list.append(
+                    nn.Sequential(
+                        nn.Conv2d(
+                            in_channels,
+                            hidden_dim,
+                            kernel_size=3,
+                            stride=2,
+                            padding=1),
+                        nn.GroupNorm(
+                            32,
+                            hidden_dim)))
                 in_channels = hidden_dim
             self.input_proj = nn.ModuleList(input_proj_list)
         else:
@@ -916,15 +1065,21 @@ class DINO(nn.Module):
         nn.init.constant_(_bbox_embed.layers[-1].bias.data, 0)
 
         if dec_pred_bbox_embed_share:
-            box_embed_layerlist = [_bbox_embed for _ in range(transformer.num_decoder_layers)]
+            box_embed_layerlist = [
+                _bbox_embed for _ in range(
+                    transformer.num_decoder_layers)]
         else:
-            box_embed_layerlist = [copy.deepcopy(_bbox_embed)
-                                   for _ in range(transformer.num_decoder_layers)]
+            box_embed_layerlist = [
+                copy.deepcopy(_bbox_embed) for _ in range(
+                    transformer.num_decoder_layers)]
         if dec_pred_class_embed_share:
-            class_embed_layerlist = [_class_embed for _ in range(transformer.num_decoder_layers)]
+            class_embed_layerlist = [
+                _class_embed for _ in range(
+                    transformer.num_decoder_layers)]
         else:
-            class_embed_layerlist = [copy.deepcopy(_class_embed)
-                                     for _ in range(transformer.num_decoder_layers)]
+            class_embed_layerlist = [
+                copy.deepcopy(_class_embed) for _ in range(
+                    transformer.num_decoder_layers)]
         self.bbox_embed = nn.ModuleList(box_embed_layerlist)
         self.class_embed = nn.ModuleList(class_embed_layerlist)
         self.transformer.decoder.bbox_embed = self.bbox_embed
@@ -935,11 +1090,13 @@ class DINO(nn.Module):
             if two_stage_bbox_embed_share:
                 self.transformer.enc_out_bbox_embed = _bbox_embed
             else:
-                self.transformer.enc_out_bbox_embed = copy.deepcopy(_bbox_embed)
+                self.transformer.enc_out_bbox_embed = copy.deepcopy(
+                    _bbox_embed)
             if two_stage_class_embed_share:
                 self.transformer.enc_out_class_embed = _class_embed
             else:
-                self.transformer.enc_out_class_embed = copy.deepcopy(_class_embed)
+                self.transformer.enc_out_class_embed = copy.deepcopy(
+                    _class_embed)
 
         self.label_embedding = None
         for layer in self.transformer.decoder.layers:
@@ -959,19 +1116,20 @@ class DINO(nn.Module):
 
         srcs = []
         masks = []
-        for l, feat in enumerate(features):
+        for level_idx, feat in enumerate(features):
             src, mask = feat.decompose()
-            srcs.append(self.input_proj[l](src))
+            srcs.append(self.input_proj[level_idx](src))
             masks.append(mask)
         if self.num_feature_levels > len(srcs):
             _len_srcs = len(srcs)
-            for l in range(_len_srcs, self.num_feature_levels):
-                if l == _len_srcs:
-                    src = self.input_proj[l](features[-1].tensors)
+            for level_idx in range(_len_srcs, self.num_feature_levels):
+                if level_idx == _len_srcs:
+                    src = self.input_proj[level_idx](features[-1].tensors)
                 else:
-                    src = self.input_proj[l](srcs[-1])
+                    src = self.input_proj[level_idx](srcs[-1])
                 m = samples.mask
-                mask = F.interpolate(m[None].float(), size=src.shape[-2:]).to(torch.bool)[0]
+                mask = F.interpolate(m[None].float(),
+                                     size=src.shape[-2:]).to(torch.bool)[0]
                 pos_l = self.backbone[1](NestedTensor(src, mask)).to(src.dtype)
                 srcs.append(src)
                 masks.append(mask)
@@ -997,7 +1155,8 @@ class DINO(nn.Module):
         for dec_lid, (layer_ref_sig, layer_bbox_embed, layer_hs) in enumerate(
                 zip(reference[:-1], self.bbox_embed, hs)):
             layer_delta_unsig = layer_bbox_embed(layer_hs)
-            layer_outputs_unsig = layer_delta_unsig + inverse_sigmoid(layer_ref_sig)
+            layer_outputs_unsig = layer_delta_unsig + \
+                inverse_sigmoid(layer_ref_sig)
             layer_outputs_unsig = layer_outputs_unsig.sigmoid()
             outputs_coord_list.append(layer_outputs_unsig)
         outputs_coord_list = torch.stack(outputs_coord_list)
@@ -1011,9 +1170,11 @@ class DINO(nn.Module):
                 dn_post_process(outputs_class, outputs_coord_list,
                                 dn_meta, self.aux_loss, self._set_aux_loss)
 
-        out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord_list[-1]}
+        out = {'pred_logits': outputs_class[-1],
+               'pred_boxes': outputs_coord_list[-1]}
         if self.aux_loss:
-            out['aux_outputs'] = self._set_aux_loss(outputs_class, outputs_coord_list)
+            out['aux_outputs'] = self._set_aux_loss(
+                outputs_class, outputs_coord_list)
 
         if hs_enc is not None:
             interm_coord = ref_enc[-1]
@@ -1038,7 +1199,8 @@ class DINO(nn.Module):
 
 def sigmoid_focal_loss(inputs, targets, num_boxes, alpha=0.25, gamma=2):
     prob = inputs.sigmoid()
-    ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+    ce_loss = F.binary_cross_entropy_with_logits(
+        inputs, targets, reduction="none")
     p_t = prob * targets + (1 - prob) * (1 - targets)
     loss = ce_loss * ((1 - p_t) ** gamma)
     if alpha >= 0:
@@ -1048,7 +1210,12 @@ def sigmoid_focal_loss(inputs, targets, num_boxes, alpha=0.25, gamma=2):
 
 
 class HungarianMatcher(nn.Module):
-    def __init__(self, cost_class=1.0, cost_bbox=1.0, cost_giou=1.0, focal_alpha=0.25):
+    def __init__(
+            self,
+            cost_class=1.0,
+            cost_bbox=1.0,
+            cost_giou=1.0,
+            focal_alpha=0.25):
         super().__init__()
         self.cost_class = cost_class
         self.cost_bbox = cost_bbox
@@ -1066,8 +1233,10 @@ class HungarianMatcher(nn.Module):
 
         alpha = self.focal_alpha
         gamma = 2.0
-        neg_cost_class = (1 - alpha) * (out_prob ** gamma) * (-(1 - out_prob + 1e-8).log())
-        pos_cost_class = alpha * ((1 - out_prob) ** gamma) * (-(out_prob + 1e-8).log())
+        neg_cost_class = (1 - alpha) * (out_prob ** gamma) * \
+            (-(1 - out_prob + 1e-8).log())
+        pos_cost_class = alpha * \
+            ((1 - out_prob) ** gamma) * (-(out_prob + 1e-8).log())
         cost_class = pos_cost_class[:, tgt_ids] - neg_cost_class[:, tgt_ids]
 
         cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)
@@ -1115,15 +1284,18 @@ class SetCriterion(nn.Module):
             alpha=self.focal_alpha, gamma=2) * src_logits.shape[1]
         losses = {'loss_ce': loss_ce}
         if log:
-            losses['class_error'] = 100 - accuracy(src_logits[idx], target_classes_o)[0]
+            losses['class_error'] = 100 - \
+                accuracy(src_logits[idx], target_classes_o)[0]
         return losses
 
     @torch.no_grad()
     def loss_cardinality(self, outputs, targets, indices, num_boxes):
         pred_logits = outputs['pred_logits']
         device = pred_logits.device
-        tgt_lengths = torch.as_tensor([len(v["labels"]) for v in targets], device=device)
-        card_pred = (pred_logits.argmax(-1) != pred_logits.shape[-1] - 1).sum(1)
+        tgt_lengths = torch.as_tensor(
+            [len(v["labels"]) for v in targets], device=device)
+        card_pred = (pred_logits.argmax(-1) !=
+                     pred_logits.shape[-1] - 1).sum(1)
         card_err = F.l1_loss(card_pred.float(), tgt_lengths.float())
         return {'cardinality_error': card_err}
 
@@ -1155,12 +1327,14 @@ class SetCriterion(nn.Module):
         return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
 
     def forward(self, outputs, targets, return_indices=False):
-        outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
+        outputs_without_aux = {k: v for k,
+                               v in outputs.items() if k != 'aux_outputs'}
         device = next(iter(outputs.values())).device
         indices = self.matcher(outputs_without_aux, targets)
 
         num_boxes = sum(len(t["labels"]) for t in targets)
-        num_boxes = torch.as_tensor([num_boxes], dtype=torch.float, device=device)
+        num_boxes = torch.as_tensor(
+            [num_boxes], dtype=torch.float, device=device)
         if is_dist_avail_and_initialized():
             torch.distributed.all_reduce(num_boxes)
         num_boxes = torch.clamp(num_boxes / get_world_size(), min=1).item()
@@ -1169,16 +1343,21 @@ class SetCriterion(nn.Module):
 
         dn_meta = outputs['dn_meta']
         if self.training and dn_meta and 'output_known_lbs_bboxes' in dn_meta:
-            output_known_lbs_bboxes, single_pad, scalar = self.prep_for_dn(dn_meta)
+            output_known_lbs_bboxes, single_pad, scalar = self.prep_for_dn(
+                dn_meta)
             dn_pos_idx = []
             dn_neg_idx = []
             for i in range(len(targets)):
                 if len(targets[i]['labels']) > 0:
-                    t = torch.arange(0, len(targets[i]['labels'])).long().cuda()
+                    t = torch.arange(0,
+                                     len(targets[i]['labels'])).long().cuda()
                     t = t.unsqueeze(0).repeat(scalar, 1)
                     tgt_idx = t.flatten()
-                    output_idx = ((torch.tensor(range(scalar)) * single_pad).long().cuda()
-                                  .unsqueeze(1) + t)
+                    output_idx = (
+                        (torch.tensor(
+                            range(scalar)) *
+                            single_pad).long().cuda() .unsqueeze(1) +
+                        t)
                     output_idx = output_idx.flatten()
                 else:
                     output_idx = tgt_idx = torch.tensor([]).long().cuda()
@@ -1205,7 +1384,13 @@ class SetCriterion(nn.Module):
             losses.update(l_dict)
 
         for loss in self.losses:
-            losses.update(self.get_loss(loss, outputs, targets, indices, num_boxes))
+            losses.update(
+                self.get_loss(
+                    loss,
+                    outputs,
+                    targets,
+                    indices,
+                    num_boxes))
 
         if 'aux_outputs' in outputs:
             for idx_aux, aux_outputs in enumerate(outputs['aux_outputs']):
@@ -1229,7 +1414,9 @@ class SetCriterion(nn.Module):
                         l_dict.update(self.get_loss(
                             loss, aux_outputs_known, targets,
                             dn_pos_idx, num_boxes * scalar, **kwargs))
-                    l_dict = {k + f'_dn_{idx_aux}': v for k, v in l_dict.items()}
+                    l_dict = {
+                        k + f'_dn_{idx_aux}': v for k,
+                        v in l_dict.items()}
                     losses.update(l_dict)
                 else:
                     l_dict = {
@@ -1293,7 +1480,8 @@ class PostProcess(nn.Module):
         if test:
             assert not not_to_xyxy
             boxes[:, :, 2:] = boxes[:, :, 2:] - boxes[:, :, :2]
-        boxes = torch.gather(boxes, 1, topk_boxes.unsqueeze(-1).repeat(1, 1, 4))
+        boxes = torch.gather(
+            boxes, 1, topk_boxes.unsqueeze(-1).repeat(1, 1, 4))
 
         img_h, img_w = target_sizes.unbind(1)
         scale_fct = torch.stack([img_w, img_h, img_w, img_h], dim=1)
@@ -1302,11 +1490,13 @@ class PostProcess(nn.Module):
         if self.nms_iou_threshold > 0:
             item_indices = [nms(b, s, iou_threshold=self.nms_iou_threshold)
                             for b, s in zip(boxes, scores)]
-            results = [{'scores': s[i], 'labels': l[i], 'boxes': b[i]}
-                       for s, l, b, i in zip(scores, labels, boxes, item_indices)]
+            results = [
+                {'scores': score[idx], 'labels': label[idx], 'boxes': box[idx]}
+                for score, label, box, idx in zip(scores, labels, boxes, item_indices)
+            ]
         else:
-            results = [{'scores': s, 'labels': l, 'boxes': b}
-                       for s, l, b in zip(scores, labels, boxes)]
+            results = [{'scores': score, 'labels': label, 'boxes': box}
+                       for score, label, box in zip(scores, labels, boxes)]
         return results
 
 
@@ -1410,7 +1600,8 @@ def build_model(config):
     if config.get('aux_loss', True):
         aux_weight_dict = {}
         for i in range(config['dec_layers'] - 1):
-            aux_weight_dict.update({k + f'_{i}': v for k, v in clean_weight_dict.items()})
+            aux_weight_dict.update(
+                {k + f'_{i}': v for k, v in clean_weight_dict.items()})
         weight_dict.update(aux_weight_dict)
 
     if config.get('two_stage_type', 'standard') != 'no':

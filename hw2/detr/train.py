@@ -56,7 +56,8 @@ class CocoEvaluator(object):
             results = self.prepare(predictions, iou_type)
             with open(os.devnull, 'w') as devnull:
                 with contextlib.redirect_stdout(devnull):
-                    coco_dt = COCO.loadRes(self.coco_gt, results) if results else COCO()
+                    coco_dt = COCO.loadRes(
+                        self.coco_gt, results) if results else COCO()
             coco_eval = self.coco_eval[iou_type]
             coco_eval.cocoDt = coco_dt
             coco_eval.params.imgIds = list(img_ids)
@@ -65,8 +66,12 @@ class CocoEvaluator(object):
 
     def synchronize_between_processes(self):
         for iou_type in self.iou_types:
-            self.eval_imgs[iou_type] = np.concatenate(self.eval_imgs[iou_type], 2)
-            _create_common_coco_eval(self.coco_eval[iou_type], self.img_ids, self.eval_imgs[iou_type])
+            self.eval_imgs[iou_type] = np.concatenate(
+                self.eval_imgs[iou_type], 2)
+            _create_common_coco_eval(
+                self.coco_eval[iou_type],
+                self.img_ids,
+                self.eval_imgs[iou_type])
 
     def accumulate(self):
         for coco_eval in self.coco_eval.values():
@@ -139,7 +144,10 @@ def _coco_evaluate(coco_eval):
         for areaRng in p.areaRng
         for imgId in p.imgIds
     ]
-    evalImgs = np.asarray(evalImgs).reshape(len(catIds), len(p.areaRng), len(p.imgIds))
+    evalImgs = np.asarray(evalImgs).reshape(
+        len(catIds), len(
+            p.areaRng), len(
+            p.imgIds))
     coco_eval._paramsEval = copy.deepcopy(coco_eval.params)
     return p.imgIds, evalImgs
 
@@ -215,12 +223,25 @@ def compute_map95(coco_evaluator):
 # Train / Evaluate
 # ---------------------------------------------------------------------------
 
-def train_one_epoch(model, criterion, data_loader, optimizer, device, epoch, max_norm=0):
+def train_one_epoch(
+        model,
+        criterion,
+        data_loader,
+        optimizer,
+        device,
+        epoch,
+        max_norm=0):
     model.train()
     criterion.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
-    metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    metric_logger.add_meter(
+        'lr', utils.SmoothedValue(
+            window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter(
+        'class_error',
+        utils.SmoothedValue(
+            window_size=1,
+            fmt='{value:.2f}'))
 
     progress = tqdm(data_loader, desc=f'Train Epoch {epoch}', leave=False)
     for samples, targets in progress:
@@ -230,12 +251,16 @@ def train_one_epoch(model, criterion, data_loader, optimizer, device, epoch, max
         outputs = model(samples)
         loss_dict = criterion(outputs, targets)
         weight_dict = criterion.weight_dict
-        losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
+        losses = sum(loss_dict[k] * weight_dict[k]
+                     for k in loss_dict.keys() if k in weight_dict)
 
         loss_dict_reduced = utils.reduce_dict(loss_dict)
-        loss_dict_reduced_unscaled = {f'{k}_unscaled': v for k, v in loss_dict_reduced.items()}
-        loss_dict_reduced_scaled = {k: v * weight_dict[k]
-                                    for k, v in loss_dict_reduced.items() if k in weight_dict}
+        loss_dict_reduced_unscaled = {
+            f'{k}_unscaled': v for k,
+            v in loss_dict_reduced.items()}
+        loss_dict_reduced_scaled = {
+            k: v * weight_dict[k] for k,
+            v in loss_dict_reduced.items() if k in weight_dict}
         losses_reduced_scaled = sum(loss_dict_reduced_scaled.values())
 
         loss_value = losses_reduced_scaled.item()
@@ -251,11 +276,17 @@ def train_one_epoch(model, criterion, data_loader, optimizer, device, epoch, max
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
         optimizer.step()
 
-        metric_logger.update(loss=loss_value, **loss_dict_reduced_scaled, **loss_dict_reduced_unscaled)
+        metric_logger.update(
+            loss=loss_value,
+            **loss_dict_reduced_scaled,
+            **loss_dict_reduced_unscaled)
         metric_logger.update(class_error=loss_dict_reduced['class_error'])
         metric_logger.update(lr=optimizer.param_groups[0]['lr'])
 
-        progress.set_postfix(loss=f'{loss_value:.4f}', lr=f"{optimizer.param_groups[0]['lr']:.2e}")
+        progress.set_postfix(
+            loss=f'{
+                loss_value:.4f}', lr=f"{
+                optimizer.param_groups[0]['lr']:.2e}")
 
     metric_logger.synchronize_between_processes()
     print('Averaged train stats:', metric_logger)
@@ -263,12 +294,23 @@ def train_one_epoch(model, criterion, data_loader, optimizer, device, epoch, max
 
 
 @torch.no_grad()
-def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, epoch):
+def evaluate(
+        model,
+        criterion,
+        postprocessors,
+        data_loader,
+        base_ds,
+        device,
+        epoch):
     model.eval()
     criterion.eval()
 
     metric_logger = utils.MetricLogger(delimiter='  ')
-    metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    metric_logger.add_meter(
+        'class_error',
+        utils.SmoothedValue(
+            window_size=1,
+            fmt='{value:.2f}'))
 
     iou_types = tuple(k for k in ('bbox',) if k in postprocessors.keys())
     coco_evaluator = CocoEvaluator(base_ds, iou_types)
@@ -283,8 +325,9 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, epo
         weight_dict = criterion.weight_dict
 
         loss_dict_reduced = utils.reduce_dict(loss_dict)
-        loss_dict_reduced_scaled = {k: v * weight_dict[k]
-                                    for k, v in loss_dict_reduced.items() if k in weight_dict}
+        loss_dict_reduced_scaled = {
+            k: v * weight_dict[k] for k,
+            v in loss_dict_reduced.items() if k in weight_dict}
         loss_dict_reduced_unscaled = {f'{k}_unscaled': v
                                       for k, v in loss_dict_reduced.items()}
         valid_loss = sum(loss_dict_reduced_scaled.values()).item()
@@ -293,9 +336,14 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, epo
                              **loss_dict_reduced_unscaled)
         metric_logger.update(class_error=loss_dict_reduced['class_error'])
 
-        orig_target_sizes = torch.stack([t['orig_size'] for t in targets], dim=0)
+        orig_target_sizes = torch.stack(
+            [t['orig_size'] for t in targets], dim=0)
         results = postprocessors['bbox'](outputs, orig_target_sizes)
-        res = {target['image_id'].item(): output for target, output in zip(targets, results)}
+        res = {
+            target['image_id'].item(): output for target,
+            output in zip(
+                targets,
+                results)}
         if coco_evaluator is not None:
             coco_evaluator.update(res)
 
@@ -334,19 +382,29 @@ def main(config_path):
     model, criterion, postprocessors = build_model(config)
     model.to(device)
 
-    n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    n_parameters = sum(p.numel()
+                       for p in model.parameters() if p.requires_grad)
     print('number of params:', n_parameters)
 
     param_dicts = [
-        {'params': [p for n, p in model.named_parameters() if 'backbone' not in n and p.requires_grad]},
         {
-            'params': [p for n, p in model.named_parameters() if 'backbone' in n and p.requires_grad],
+            'params': [
+                p for n, p in model.named_parameters()
+                if 'backbone' not in n and p.requires_grad
+            ]
+        },
+        {
+            'params': [
+                p for n, p in model.named_parameters()
+                if 'backbone' in n and p.requires_grad
+            ],
             'lr': config['lr_backbone'],
         },
     ]
     optimizer = torch.optim.AdamW(param_dicts, lr=config['lr'],
                                   weight_decay=config['weight_decay'])
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, config['lr_drop'])
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(
+        optimizer, config['lr_drop'])
 
     dataset_train = build_dataset(image_set='train', config=config)
     dataset_val = build_dataset(image_set='val', config=config)
@@ -357,10 +415,18 @@ def main(config_path):
     batch_sampler_train = torch.utils.data.BatchSampler(
         sampler_train, config['batch_size'], drop_last=True)
 
-    data_loader_train = DataLoader(dataset_train, batch_sampler=batch_sampler_train,
-                                   collate_fn=collate_fn, num_workers=config['num_workers'])
-    data_loader_val = DataLoader(dataset_val, config['batch_size'], sampler=sampler_val,
-                                 drop_last=False, collate_fn=collate_fn, num_workers=config['num_workers'])
+    data_loader_train = DataLoader(
+        dataset_train,
+        batch_sampler=batch_sampler_train,
+        collate_fn=collate_fn,
+        num_workers=config['num_workers'])
+    data_loader_val = DataLoader(
+        dataset_val,
+        config['batch_size'],
+        sampler=sampler_val,
+        drop_last=False,
+        collate_fn=collate_fn,
+        num_workers=config['num_workers'])
 
     base_ds = get_coco_api_from_dataset(dataset_val)
 
@@ -372,7 +438,11 @@ def main(config_path):
         print(f"Resuming from checkpoint: {config['resume']}")
         checkpoint = torch.load(config['resume'], map_location='cpu')
         model.load_state_dict(checkpoint['model'])
-        if 'optimizer' in checkpoint and 'lr_scheduler' in checkpoint and 'epoch' in checkpoint:
+        if (
+            'optimizer' in checkpoint
+            and 'lr_scheduler' in checkpoint
+            and 'epoch' in checkpoint
+        ):
             optimizer.load_state_dict(checkpoint['optimizer'])
             lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
             start_epoch = checkpoint['epoch'] + 1
@@ -402,13 +472,22 @@ def main(config_path):
             }, checkpoint_path)
 
         test_stats, coco_evaluator = evaluate(
-            model, criterion, postprocessors, data_loader_val, base_ds, device, epoch
+            model,
+            criterion,
+            postprocessors,
+            data_loader_val,
+            base_ds,
+            device,
+            epoch,
         )
 
         coco_stats = test_stats.get('coco_eval_bbox', [float('nan')] * 12)
-        coco_map_50_95 = float(coco_stats[0]) if len(coco_stats) > 0 else float('nan')
-        coco_map_50 = float(coco_stats[1]) if len(coco_stats) > 1 else float('nan')
-        coco_map_75 = float(coco_stats[2]) if len(coco_stats) > 2 else float('nan')
+        coco_map_50_95 = float(coco_stats[0]) if len(
+            coco_stats) > 0 else float('nan')
+        coco_map_50 = float(coco_stats[1]) if len(
+            coco_stats) > 1 else float('nan')
+        coco_map_75 = float(coco_stats[2]) if len(
+            coco_stats) > 2 else float('nan')
         coco_map_95 = compute_map95(coco_evaluator)
 
         if coco_map_50_95 > best_map:
@@ -435,13 +514,23 @@ def main(config_path):
                 'train/loss_ce': float(train_stats.get('loss_ce', float('nan'))),
                 'train/loss_bbox': float(train_stats.get('loss_bbox', float('nan'))),
                 'train/loss_giou': float(train_stats.get('loss_giou', float('nan'))),
-                'train/class_error': float(train_stats.get('class_error', float('nan'))),
-                'train/lr': float(train_stats.get('lr', optimizer.param_groups[0]['lr'])),
+                'train/class_error': float(
+                    train_stats.get('class_error', float('nan'))
+                ),
+                'train/lr': float(
+                    train_stats.get('lr', optimizer.param_groups[0]['lr'])
+                ),
                 'valid/loss': float(test_stats.get('loss', float('nan'))),
                 'valid/loss_ce': float(test_stats.get('loss_ce', float('nan'))),
-                'valid/loss_bbox': float(test_stats.get('loss_bbox', float('nan'))),
-                'valid/loss_giou': float(test_stats.get('loss_giou', float('nan'))),
-                'valid/class_error': float(test_stats.get('class_error', float('nan'))),
+                'valid/loss_bbox': float(
+                    test_stats.get('loss_bbox', float('nan'))
+                ),
+                'valid/loss_giou': float(
+                    test_stats.get('loss_giou', float('nan'))
+                ),
+                'valid/class_error': float(
+                    test_stats.get('class_error', float('nan'))
+                ),
                 'valid/mAP@50': coco_map_50,
                 'valid/mAP@75': coco_map_75,
                 'valid/mAP@95': coco_map_95,

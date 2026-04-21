@@ -55,7 +55,8 @@ class CocoEvaluator(object):
             results = self.prepare(predictions, iou_type)
             with open(os.devnull, 'w') as devnull:
                 with contextlib.redirect_stdout(devnull):
-                    coco_dt = COCO.loadRes(self.coco_gt, results) if results else COCO()
+                    coco_dt = COCO.loadRes(
+                        self.coco_gt, results) if results else COCO()
             coco_eval = self.coco_eval[iou_type]
             coco_eval.cocoDt = coco_dt
             coco_eval.params.imgIds = list(img_ids)
@@ -64,7 +65,8 @@ class CocoEvaluator(object):
 
     def synchronize_between_processes(self):
         for iou_type in self.iou_types:
-            self.eval_imgs[iou_type] = np.concatenate(self.eval_imgs[iou_type], 2)
+            self.eval_imgs[iou_type] = np.concatenate(
+                self.eval_imgs[iou_type], 2)
             _create_common_coco_eval(self.coco_eval[iou_type],
                                      self.img_ids, self.eval_imgs[iou_type])
 
@@ -126,7 +128,10 @@ def _coco_evaluate(coco_eval):
     evalImgs = [
         coco_eval.evaluateImg(imgId, catId, areaRng, maxDet)
         for catId in catIds for areaRng in p.areaRng for imgId in p.imgIds]
-    evalImgs = np.asarray(evalImgs).reshape(len(catIds), len(p.areaRng), len(p.imgIds))
+    evalImgs = np.asarray(evalImgs).reshape(
+        len(catIds), len(
+            p.areaRng), len(
+            p.imgIds))
     coco_eval._paramsEval = copy.deepcopy(coco_eval.params)
     return p.imgIds, evalImgs
 
@@ -221,7 +226,8 @@ def build_optimizer(model, config):
         {'params': backbone_params, 'lr': lr_backbone},
         {'params': linear_proj_params, 'lr': lr * lr_linear_proj_mult},
     ]
-    optimizer = torch.optim.AdamW(param_dicts, lr=lr, weight_decay=weight_decay)
+    optimizer = torch.optim.AdamW(
+        param_dicts, lr=lr, weight_decay=weight_decay)
     return optimizer
 
 
@@ -234,8 +240,14 @@ def train_one_epoch(model, criterion, data_loader, optimizer, device, epoch,
     model.train()
     criterion.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
-    metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    metric_logger.add_meter(
+        'lr', utils.SmoothedValue(
+            window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter(
+        'class_error',
+        utils.SmoothedValue(
+            window_size=1,
+            fmt='{value:.2f}'))
 
     progress = tqdm(data_loader, desc=f'Train Epoch {epoch}', leave=False)
     for samples, targets in progress:
@@ -292,8 +304,11 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device,
     criterion.eval()
 
     metric_logger = utils.MetricLogger(delimiter='  ')
-    metric_logger.add_meter('class_error',
-                            utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    metric_logger.add_meter(
+        'class_error',
+        utils.SmoothedValue(
+            window_size=1,
+            fmt='{value:.2f}'))
 
     iou_types = tuple(k for k in ('bbox',) if k in postprocessors.keys())
     coco_evaluator = CocoEvaluator(base_ds, iou_types)
@@ -324,7 +339,8 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device,
         if 'class_error' in loss_dict_reduced:
             metric_logger.update(class_error=loss_dict_reduced['class_error'])
 
-        orig_target_sizes = torch.stack([t['orig_size'] for t in targets], dim=0)
+        orig_target_sizes = torch.stack(
+            [t['orig_size'] for t in targets], dim=0)
         results = postprocessors['bbox'](outputs, orig_target_sizes)
         res = {target['image_id'].item(): output
                for target, output in zip(targets, results)}
@@ -366,7 +382,8 @@ def main(config_path):
     model, criterion, postprocessors = build_model(config)
     model.to(device)
 
-    n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    n_parameters = sum(p.numel()
+                       for p in model.parameters() if p.requires_grad)
     print('number of params:', n_parameters)
 
     optimizer = build_optimizer(model, config)
@@ -382,12 +399,18 @@ def main(config_path):
     batch_sampler_train = torch.utils.data.BatchSampler(
         sampler_train, config['batch_size'], drop_last=True)
 
-    data_loader_train = DataLoader(dataset_train, batch_sampler=batch_sampler_train,
-                                   collate_fn=collate_fn,
-                                   num_workers=config['num_workers'])
-    data_loader_val = DataLoader(dataset_val, config['batch_size'], sampler=sampler_val,
-                                 drop_last=False, collate_fn=collate_fn,
-                                 num_workers=config['num_workers'])
+    data_loader_train = DataLoader(
+        dataset_train,
+        batch_sampler=batch_sampler_train,
+        collate_fn=collate_fn,
+        num_workers=config['num_workers'])
+    data_loader_val = DataLoader(
+        dataset_val,
+        config['batch_size'],
+        sampler=sampler_val,
+        drop_last=False,
+        collate_fn=collate_fn,
+        num_workers=config['num_workers'])
 
     base_ds = get_coco_api_from_dataset(dataset_val)
 
@@ -439,9 +462,12 @@ def main(config_path):
             epoch, use_dn=use_dn)
 
         coco_stats = test_stats.get('coco_eval_bbox', [float('nan')] * 12)
-        coco_map_50_95 = float(coco_stats[0]) if len(coco_stats) > 0 else float('nan')
-        coco_map_50 = float(coco_stats[1]) if len(coco_stats) > 1 else float('nan')
-        coco_map_75 = float(coco_stats[2]) if len(coco_stats) > 2 else float('nan')
+        coco_map_50_95 = float(coco_stats[0]) if len(
+            coco_stats) > 0 else float('nan')
+        coco_map_50 = float(coco_stats[1]) if len(
+            coco_stats) > 1 else float('nan')
+        coco_map_75 = float(coco_stats[2]) if len(
+            coco_stats) > 2 else float('nan')
         coco_map_95 = compute_map95(coco_evaluator)
 
         val_loss = float(test_stats.get('loss', float('inf')))
@@ -472,8 +498,12 @@ def main(config_path):
                 'train/loss_ce': float(train_stats.get('loss_ce', float('nan'))),
                 'train/loss_bbox': float(train_stats.get('loss_bbox', float('nan'))),
                 'train/loss_giou': float(train_stats.get('loss_giou', float('nan'))),
-                'train/class_error': float(train_stats.get('class_error', float('nan'))),
-                'train/lr': float(train_stats.get('lr', optimizer.param_groups[0]['lr'])),
+                'train/class_error': float(
+                    train_stats.get('class_error', float('nan'))
+                ),
+                'train/lr': float(
+                    train_stats.get('lr', optimizer.param_groups[0]['lr'])
+                ),
                 'valid/loss': float(test_stats.get('loss', float('nan'))),
                 'valid/loss_ce': float(test_stats.get('loss_ce', float('nan'))),
                 'valid/loss_bbox': float(test_stats.get('loss_bbox', float('nan'))),
