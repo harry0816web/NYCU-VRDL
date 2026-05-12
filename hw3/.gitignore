@@ -1,0 +1,5 @@
+data/
+.venv/
+Report/
+dataset.txt
+report.md
