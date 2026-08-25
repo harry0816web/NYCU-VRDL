@@ -131,4 +131,4 @@ After generating `pred.npz`, place it inside the submission zip as required by C
 
 ## Performance snapshot
 
-1780373173118
+![Snapshot](image/readme/1780373173118.png)
