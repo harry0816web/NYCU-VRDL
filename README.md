@@ -1,61 +1,50 @@
-# NYCU Visual Recognition using Deep Learning
+# NYCU Visual Recognition Using Deep Learning
 
-本 repository 收錄國立陽明交通大學 **Visual Recognition using Deep Learning** 課程的作業實作。四個 project 分別涵蓋影像分類、物件偵測、實例分割與影像復原。
+Coursework for **Visual Recognition Using Deep Learning** at National Yang Ming Chiao Tung University. This repository contains four computer-vision assignments covering image classification, object detection, instance segmentation, and image restoration.
 
-## Projects
+## Assignments
 
-| Project | 主題 | 主要方法 | 輸出 |
-| --- | --- | --- | --- |
-| [HW1](hw1/) | 影像分類 | ResNeXt-50、Bagging Ensemble | `prediction.csv` |
-| [HW2](hw2/) | 物件偵測 | DINO、DETR | COCO 格式的預測 JSON |
-| [HW3](hw3/) | 細胞實例分割 | Mask R-CNN、FPN | COCO RLE 格式的 `submission.json` |
-| [HW4](hw4/) | 去雨、去雪影像復原 | PromptIR | `pred.npz` |
+| Assignment | Task | Approach | Submission | Resources |
+| --- | --- | --- | --- | --- |
+| **HW1** | 100-class image classification | ImageNet-pretrained ResNeXt-50, data augmentation, and a three-seed bagging ensemble | `prediction.csv` | [Code](hw1/) · [README](hw1/README.md) · [Report](hw1/112550097_HW1.pdf) · [Brief](<hw1/(114-2) HW1 Slides.pdf>) |
+| **HW2** | Digit object detection | DINO with a ResNet-50 backbone; DETR is included as a baseline | COCO-format `pred.json` | [Code](hw2/) · [README](hw2/README.md) · [Report](hw2/112550097_HW2.pdf) · [Brief](<hw2/(114-2) HW2 Slides.pdf>) |
+| **HW3** | Cell instance segmentation | Mask R-CNN with a ConvNeXt-Small backbone and FPN | COCO RLE `test-results.json` | [Code](hw3/) · [README](hw3/README.md) · [Report](hw3/112550097_HW3.pdf) · [Brief](<hw3/(114-2) HW3 Slides.pdf>) |
+| **HW4** | Rain and snow image restoration | PromptIR with spatial prompts, EMA, L1 + SSIM loss, and test-time augmentation | `pred.npz` | [Code](hw4/) · [README](hw4/readme.md) · [Report](hw4/112550097_HW4.pdf) · [Brief](<hw4/(114-2) HW4 Slides.pdf>) |
 
-### [HW1: Image Classification](hw1/)
+## Highlights
 
-針對 100 個類別進行影像分類。以 ImageNet 預訓練的 **ResNeXt-50** 為 backbone，搭配資料增強、label smoothing 與三組不同 random seed 的 Bagging 訓練；推論時以 soft voting 整合三個模型的結果，產生測試集分類結果。
+### HW1 — Image Classification
 
-- 訓練與推論入口：`hw1/train.py`
-- 詳細說明：[hw1/README.md](hw1/README.md)
+Classifies approximately 23,000 images across 100 categories. The final system fine-tunes a ResNeXt-50 model with strong augmentation and label smoothing, then combines models trained with different random seeds through soft-voting bagging.
 
-### [HW2: Object Detection](hw2/)
+### HW2 — Object Detection
 
-在 11 類物件資料集上進行物件偵測。專案包含 **DETR** baseline 與主要使用的 **DINO** 實作，負責預測物件類別、bounding box 與 confidence score；DINO 版本另提供 ensemble 訓練與推論工具。
+Detects digit instances in COCO-format data. The main solution replaces vanilla DETR with DINO, uses multi-scale deformable attention, reduces the transformer depth for the dataset, and increases input resolution to preserve small digit features.
 
-- DINO 實作：`hw2/dino/`
-- DETR baseline：`hw2/detr/`
-- 詳細說明：[hw2/README.md](hw2/README.md)
+### HW3 — Instance Segmentation
 
-### [HW3: Instance Segmentation](hw3/)
+Segments four categories of cells in densely populated microscopy images. The solution combines Mask R-CNN, a ConvNeXt-Small backbone, and FPN, with increased proposal and detection budgets to improve recall in crowded scenes.
 
-對顯微影像中的細胞進行四類 **instance segmentation**。模型採用 **Mask R-CNN + FPN**，並針對單張影像包含大量細胞的情況調整 proposals 與 detections 數量；同時使用資料增強與快取機制改善小型資料集的訓練效率。最終預測以 COCO-style RLE 格式提交，評估指標為 AP50。
+### HW4 — Image Restoration
 
-- 訓練入口：`hw3/train.py`
-- 推論入口：`hw3/inference.py`
-- 詳細說明：[hw3/README.md](hw3/README.md)
+Restores images degraded by rain or snow using a single PromptIR model. The final recipe adds spatially gated prompts, EMA weights, a combined L1 and SSIM objective, and eight-way geometric self-ensemble inference.
 
-### [HW4: Image Restoration](hw4/)
-
-使用單一模型移除 RGB 影像中的雨與雪。專案以 **PromptIR** 為基礎，使用 PyTorch Lightning 從頭訓練，並支援 spatial prompt、EMA、複合 loss 與 test-time augmentation 等選項。模型輸出復原後的影像，評估指標為 PSNR。
-
-- 訓練入口：`hw4/train.py`
-- 推論入口：`hw4/inference.py`
-- 詳細說明：[hw4/readme.md](hw4/readme.md)
-
-## Repository Structure
+## Repository Layout
 
 ```text
 NYCU-VRDL/
-├── hw1/                    # Image classification
-├── hw2/                    # Object detection
-│   ├── dino/               # DINO implementation
-│   └── detr/               # DETR baseline
-├── hw3/                    # Cell instance segmentation
-├── hw4/                    # Rain and snow image restoration
-├── 2. DNN_CNN.pdf          # Course material
-└── 3. CNN_Object_Recognition.pdf
+├── hw1/   # Image classification
+├── hw2/   # Object detection (DINO and DETR)
+├── hw3/   # Cell instance segmentation
+└── hw4/   # Rain and snow image restoration
 ```
+
+Each homework directory contains its implementation, assignment brief, final report, and a dedicated README with setup, dataset layout, training, and inference instructions.
 
 ## Usage
 
-各 project 使用不同的資料格式與相依套件。請進入對應的 `hw*` 目錄，依該目錄 README 的說明準備環境與資料集後，再執行訓練或推論程式。資料集、模型 checkpoint 與預測結果不一定包含在 repository 中。
+The assignments use different environments and dataset formats. Enter the relevant `hw*` directory and follow its README before running the training or inference scripts. Datasets, checkpoints, experiment logs, and generated submissions are intentionally excluded from version control unless otherwise noted.
+
+## Author
+
+**Hung-I Yang** · Student ID `112550097`
